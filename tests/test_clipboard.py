@@ -48,3 +48,11 @@ def test_password_manager_secrets_are_skipped(qapp):
     md.setText("hunter2")
     md.setData("x-kde-passwordManagerHint", b"secret")
     assert payload_from_mime(md, 10**8) is None
+
+
+def test_combine_joins_text_and_skips_images(png):
+    from clipdeck.clipboard import combine
+    joined = combine([Payload("text", "a"), Payload("image", "i", None, png), Payload("html", "b", "<b>b</b>")])
+    assert (joined.kind, joined.text) == ("text", "a\nb")
+    assert combine([Payload("image", "i", None, png)]).kind == "image"
+    assert combine([Payload("image", "i", None, png), Payload("image", "j", None, png)]) is None

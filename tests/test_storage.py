@@ -45,3 +45,18 @@ def test_clear_loose(store):
     store.add(Payload("text", "drop"))
     store.clear_loose()
     assert [c.text for c in store.search()] == ["keep"]
+
+
+def test_update_text(store):
+    a = store.add(Payload("html", "bold", "<b>bold</b>"))
+    assert store.update_text(a, "plain now") == a
+    clip = store.get(a)
+    assert (clip.kind, clip.text, clip.html) == ("text", "plain now", None)
+
+
+def test_update_text_merges_with_existing_duplicate(store):
+    keep = store.add(Payload("text", "same"))
+    edited = store.add(Payload("text", "other"))
+    store.set_pinned(edited, True)
+    assert store.update_text(edited, "same") == keep
+    assert store.get(edited) is None and store.get(keep).pinned

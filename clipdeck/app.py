@@ -11,7 +11,7 @@ from .qt import QLocalServer
 from .qt import QApplication, QMenu, QMessageBox, QSystemTrayIcon
 
 from . import APP_ID, __author__, __version__, desktop, x11
-from .clipboard import ClipboardMonitor, make_thumb
+from .clipboard import ClipboardMonitor, combine, make_thumb
 from .popup import Popup
 from .settings import Config, SettingsDialog
 from .storage import DATA_DIR, Payload, Storage
@@ -54,6 +54,7 @@ class Clipdeck(QObject):
 
         self.popup = Popup(self.store)
         self.popup.paste_requested.connect(self.on_paste)
+        self.popup.copy_requested.connect(self.on_copy)
         self.popup.send_requested.connect(self.on_send)
 
         self._build_tray()
@@ -155,14 +156,22 @@ class Clipdeck(QObject):
         if self.cfg.get("sync_to_clipboard"):
             self.monitor.set_clipboard(p)
 
-    def on_send(self, cid: int):
-        clip = self.store.get(cid)
-        if not clip:
-            return
+    def _payload(self, ids: list[int]) -> Payload | None:
+        clips = [c for c in (self.store.get(i) for i in ids) if c]
+        return combine([c.payload for c in clips]) if clips else None
+
+    def on_copy(self, ids: list[int]):
+        payload = self._payload(ids)
+        if payload:
+            self.monitor.set_clipboard(payload)
+
+    def on_send(self, ids: list[int]):
         if not (self.sync.running and self.sync.peers):
             self.notify("Turn on sync and add other computers in Settings → Sync first.")
             return
-        self.sync.send(clip.payload)
+        for clip in (self.store.get(i) for i in ids):
+            if clip:
+                self.sync.send(clip.payload)
 
     def show_popup(self, from_tray: bool = False):
         if self.popup.isVisible():
@@ -171,12 +180,14 @@ class Clipdeck(QObject):
         self.target_window = None if from_tray or x11.is_wayland() else x11.active_window()
         self.popup.present()
 
-    def on_paste(self, cid: int, plain: bool):
-        clip = self.store.get(cid)
-        if not clip:
+    def on_paste(self, ids: list[int], plain: bool):
+        payload = self._payload(ids)
+        if not payload:
+            self.popup.flash("Images can't be pasted together with other clips")
             return
-        self.monitor.set_clipboard(clip.payload, plain)
-        self.store.touch(cid)
+        self.monitor.set_clipboard(payload, plain)
+        if len(ids) == 1:
+            self.store.touch(ids[0])  # a single pasted clip moves to the top, as in Ditto
         self.popup.hide()
         target = self.target_window
         if target and self.cfg.get("auto_paste") and x11.have_xdotool():

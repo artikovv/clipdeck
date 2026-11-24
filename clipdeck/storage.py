@@ -142,6 +142,25 @@ class Storage:
         r = self.db.execute("SELECT * FROM clips WHERE id=?", (clip_id,)).fetchone()
         return self._clip(r) if r else None
 
+    def update_text(self, clip_id: int, text: str) -> int:
+        """Replace a text clip's content (it becomes plain text). Returns the clip's id,
+        which is the existing clip's id if the new text matches one already saved."""
+        digest = Payload("text", text).digest()
+        existing = self.db.execute("SELECT id FROM clips WHERE hash=?", (digest,)).fetchone()
+        if existing and existing["id"] != clip_id:
+            old = self.get(clip_id)
+            self.db.execute("DELETE FROM clips WHERE id=?", (clip_id,))
+            # Keep the edited clip's pin and group on the surviving copy.
+            self.db.execute("UPDATE clips SET pinned=MAX(pinned, ?), group_id=COALESCE(?, group_id),"
+                            " last_used=? WHERE id=?",
+                            (int(old.pinned), old.group_id, time.time(), existing["id"]))
+            self.db.commit()
+            return existing["id"]
+        self.db.execute("UPDATE clips SET kind='text', text=?, html=NULL, hash=? WHERE id=?",
+                        (text, digest, clip_id))
+        self.db.commit()
+        return clip_id
+
     def touch(self, clip_id: int):
         self.db.execute("UPDATE clips SET last_used=? WHERE id=?", (time.time(), clip_id))
         self.db.commit()

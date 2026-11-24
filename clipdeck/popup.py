@@ -4,16 +4,18 @@ from __future__ import annotations
 import html
 import os
 
-from .qt import QEvent, QSize, Qt, QTimer, Signal
-from .qt import QCursor, QGuiApplication, QIcon, QPixmap
-from .qt import (QApplication, QComboBox, QFrame, QHBoxLayout, QInputDialog, QLabel,
-                               QLineEdit, QListWidget, QListWidgetItem, QMenu, QMessageBox,
-                               QToolButton, QVBoxLayout, QWidget)
+from .qt import QEvent, QItemSelectionModel, QSize, Qt, QTimer, Signal
+from .qt import QCursor, QFontMetrics, QGuiApplication, QIcon, QPixmap
+from .qt import (QAbstractItemView, QApplication, QComboBox, QFrame, QHBoxLayout,
+                 QInputDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMenu,
+                 QMessageBox, QPlainTextEdit, QStackedWidget, QToolButton, QVBoxLayout,
+                 QWidget)
 
 from . import x11
 from .storage import Storage
 
 ROLE_ID = Qt.ItemDataRole.UserRole
+QUICK_KEYS = 9  # Ctrl+1 … Ctrl+9
 
 STYLE = """
 #frame { background: palette(window); border: 1px solid palette(mid); border-radius: 8px; }
@@ -22,21 +24,30 @@ QListWidget::item { padding: 5px 4px; }
 #hint { color: palette(mid); }
 """
 
+HINT = ("Enter paste   Shift+Enter plain text   Del delete   Ctrl+A select all   "
+        "Ctrl+C copy   Ctrl+E edit   Ctrl+P pin   F3 preview   Esc close")
 
-def preview(text: str, limit: int = 140) -> str:
-    s = " ".join(text[:2000].split())
-    return s if len(s) <= limit else s[:limit - 1] + "…"
+
+def one_line(text: str) -> str:
+    return " ".join(text[:2000].split())
+
+
+def K(name: str) -> int:
+    return getattr(Qt.Key, name).value
 
 
 class Popup(QWidget):
-    paste_requested = Signal(int, bool)  # clip id, as plain text
-    send_requested = Signal(int)
+    paste_requested = Signal(object, bool)  # list of clip ids (in list order), as plain text
+    copy_requested = Signal(object)         # list of clip ids
+    send_requested = Signal(object)         # list of clip ids
 
     def __init__(self, store: Storage):
-        super().__init__(None, Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
+        super().__init__(None, Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint
+                         | Qt.WindowType.WindowStaysOnTopHint)
         self.store = store
         self._modal = False
         self._thumbs: dict[int, QIcon] = {}
+        self._labels: dict[int, str] = {}
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setStyleSheet(STYLE)
         self.resize(500, 560)
@@ -73,18 +84,33 @@ class Popup(QWidget):
 
         self.list = QListWidget()
         self.list.setIconSize(QSize(48, 48))
+        self.list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.list.setWordWrap(False)
         self.list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.list.customContextMenuRequested.connect(self._context_menu)
-        self.list.itemActivated.connect(lambda it: self.paste_requested.emit(it.data(ROLE_ID), False))
+        self.list.itemActivated.connect(lambda it: self.paste_requested.emit([it.data(ROLE_ID)], False))
+        self.list.currentItemChanged.connect(lambda *_: self._update_preview())
         lay.addWidget(self.list, 1)
 
-        hint = QLabel("Enter paste   Shift+Enter plain text   Ctrl+1–9 quick paste   "
-                      "Ctrl+P pin   Shift+Del delete   Esc close", objectName="hint")
-        hint.setWordWrap(True)
-        f = hint.font()
+        # F3 preview: full text, or the image at a readable size.
+        self.preview = QStackedWidget()
+        self.preview_text = QPlainTextEdit(readOnly=True)
+        self.preview_image = QLabel(alignment=Qt.AlignmentFlag.AlignCenter)
+        self.preview.addWidget(self.preview_text)
+        self.preview.addWidget(self.preview_image)
+        self.preview.setFixedHeight(170)
+        self.preview.hide()
+        lay.addWidget(self.preview)
+
+        self.hint = QLabel(HINT, objectName="hint")
+        self.hint.setWordWrap(True)
+        f = self.hint.font()
         f.setPointSizeF(f.pointSizeF() * 0.85)
-        hint.setFont(f)
-        lay.addWidget(hint)
+        self.hint.setFont(f)
+        self._hint_reset = QTimer(self, singleShot=True, interval=1800)
+        self._hint_reset.timeout.connect(lambda: self.hint.setText(HINT))
+        lay.addWidget(self.hint)
 
         self.search.installEventFilter(self)
         self.list.installEventFilter(self)
@@ -95,7 +121,6 @@ class Popup(QWidget):
         self._modal = False
         self.search.clear()
         self.rebuild_scopes()
-        self.refresh()
         pos = QCursor.pos()
         screen = QGuiApplication.screenAt(pos) or QGuiApplication.primaryScreen()
         geo = screen.availableGeometry()
@@ -103,6 +128,7 @@ class Popup(QWidget):
         y = min(max(pos.y(), geo.top()), geo.bottom() - self.height())
         self.move(x, y)
         self.show()
+        self.refresh()  # after show(), so long lines are shortened to the real width
         self.raise_()
         self.activateWindow()
         self.search.setFocus()
@@ -123,6 +149,15 @@ class Popup(QWidget):
                 and QApplication.activeModalWidget() is None):
             self.hide()
 
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        self._elide_all()
+
+    def flash(self, message: str):
+        """Show a short confirmation where the key hints are."""
+        self.hint.setText(message)
+        self._hint_reset.start()
+
     # ---- list ------------------------------------------------------------
     def rebuild_scopes(self):
         current = self.scope.currentData()
@@ -135,29 +170,60 @@ class Popup(QWidget):
         self.scope.setCurrentIndex(max(self.scope.findData(current), 0))
         self.scope.blockSignals(False)
 
-    def refresh(self):
+    def refresh(self, keep_ids: list[int] | None = None, row: int | None = None):
         scope = self.scope.currentData() or "all"
         clips = self.store.search(self.search.text(), scope)
+        self.list.blockSignals(True)
         self.list.clear()
-        for c in clips:
-            label = preview(c.text)
+        self._labels.clear()
+        for n, c in enumerate(clips, start=1):
+            label = one_line(c.text)
             if c.kind == "files":
-                n = len(c.text.splitlines())
-                label = (f"{n} files: " if n > 1 else "File: ") + label
+                count = len(c.text.splitlines())
+                label = (f"{count} files: " if count > 1 else "File: ") + label
             if c.pinned:
                 label = "📌 " + label
             if c.origin:
                 label += f"   ⇄ {c.origin}"
-            item = QListWidgetItem(label)
+            if n <= QUICK_KEYS:
+                label = f"{n}   {label}"
+            item = QListWidgetItem()
             item.setData(ROLE_ID, c.id)
+            self._labels[c.id] = label
             icon = self._icon(c)
             if icon:
                 item.setIcon(icon)
             tip = c.text[:1500] + ("…" if len(c.text) > 1500 else "")
             item.setToolTip(f"<p style='white-space:pre-wrap'>{html.escape(tip)}</p>")
             self.list.addItem(item)
-        if self.list.count():
-            self.list.setCurrentRow(0)
+        self._elide_all()
+        self.list.blockSignals(False)
+
+        if not self.list.count():
+            self._update_preview()
+            return
+        if keep_ids:
+            for i in range(self.list.count()):
+                if self.list.item(i).data(ROLE_ID) in keep_ids:
+                    self.list.item(i).setSelected(True)
+            current = next((i for i in range(self.list.count())
+                            if self.list.item(i).data(ROLE_ID) in keep_ids), None)
+            if current is not None:
+                self.list.setCurrentRow(current, QItemSelectionModel.SelectionFlag.NoUpdate)
+                self._update_preview()
+                return
+        self.list.setCurrentRow(min(max(row or 0, 0), self.list.count() - 1))
+        self._update_preview()
+
+    def _elide_all(self):
+        """Shorten long lines with "…" to fit the window, instead of scrolling sideways."""
+        fm = QFontMetrics(self.list.font())
+        width = self.list.viewport().width() - 24
+        for i in range(self.list.count()):
+            item = self.list.item(i)
+            label = self._labels.get(item.data(ROLE_ID), "")
+            room = width - (self.list.iconSize().width() + 8 if not item.icon().isNull() else 0)
+            item.setText(fm.elidedText(label, Qt.TextElideMode.ElideRight, max(room, 50)))
 
     def _icon(self, c) -> QIcon | None:
         if c.kind == "image" and c.thumb:
@@ -171,44 +237,91 @@ class Popup(QWidget):
             return QIcon.fromTheme("folder" if os.path.isdir(first) else "text-x-generic")
         return None
 
-    def _current_id(self) -> int | None:
-        it = self.list.currentItem()
-        return it.data(ROLE_ID) if it else None
+    def selected_ids(self) -> list[int]:
+        """Selected clips in list order; the current clip if nothing is selected."""
+        rows = sorted(self.list.row(it) for it in self.list.selectedItems())
+        if not rows and self.list.currentItem():
+            rows = [self.list.currentRow()]
+        return [self.list.item(r).data(ROLE_ID) for r in rows]
+
+    # ---- preview (F3) ------------------------------------------------------
+    def toggle_preview(self):
+        self.preview.setVisible(not self.preview.isVisible())
+        self._update_preview()
+
+    def _update_preview(self):
+        if not self.preview.isVisible():
+            return
+        item = self.list.currentItem()
+        clip = self.store.get(item.data(ROLE_ID)) if item else None
+        if clip and clip.kind == "image" and clip.data:
+            pm = QPixmap()
+            pm.loadFromData(clip.data, "PNG")
+            size = self.preview.size()
+            if pm.width() > size.width() or pm.height() > size.height():
+                pm = pm.scaled(size, Qt.AspectRatioMode.KeepAspectRatio,
+                               Qt.TransformationMode.SmoothTransformation)
+            self.preview_image.setPixmap(pm)
+            self.preview.setCurrentWidget(self.preview_image)
+        else:
+            self.preview_text.setPlainText(clip.text if clip else "")
+            self.preview.setCurrentWidget(self.preview_text)
 
     # ---- keyboard --------------------------------------------------------
     def eventFilter(self, obj, ev):
         if ev.type() != QEvent.Type.KeyPress:
             return False
         key, mods = int(ev.key()), ev.modifiers()
-        ctrl, shift = bool(mods & Qt.KeyboardModifier.ControlModifier), bool(mods & Qt.KeyboardModifier.ShiftModifier)
+        ctrl = bool(mods & Qt.KeyboardModifier.ControlModifier)
+        shift = bool(mods & Qt.KeyboardModifier.ShiftModifier)
+        in_search = obj is self.search
+        typing = in_search and bool(self.search.text())
 
-        if key == Qt.Key.Key_Escape.value:
-            self.hide()
+        if key == K("Key_Escape"):
+            if self.search.text():
+                self.search.clear()
+            else:
+                self.hide()
             return True
-        if key in (Qt.Key.Key_Return.value, Qt.Key.Key_Enter.value):
-            cid = self._current_id()
-            if cid is not None:
-                self.paste_requested.emit(cid, shift)
+        if key in (K("Key_Return"), K("Key_Enter")):
+            ids = self.selected_ids()
+            if ids:
+                self.paste_requested.emit(ids, shift)
             return True
-        if ctrl and Qt.Key.Key_1.value <= key <= Qt.Key.Key_9.value:
-            row = key - Qt.Key.Key_1.value
+        if ctrl and K("Key_1") <= key <= K("Key_9"):
+            row = key - K("Key_1")
             if row < self.list.count():
-                self.paste_requested.emit(self.list.item(row).data(ROLE_ID), shift)
+                self.paste_requested.emit([self.list.item(row).data(ROLE_ID)], shift)
             return True
-        if ctrl and key == Qt.Key.Key_P.value:
-            cid = self._current_id()
-            if cid is not None:
-                clip = self.store.get(cid)
-                self._set_pin(cid, not clip.pinned)
+        if ctrl and key == K("Key_A"):
+            if typing:
+                return False  # select the search text
+            self.list.selectAll()
             return True
-        if shift and key == Qt.Key.Key_Delete.value:
-            cid = self._current_id()
-            if cid is not None:
-                self._delete(cid)
+        if ctrl and key == K("Key_C"):
+            if in_search and self.search.hasSelectedText():
+                return False  # copy the search text
+            self._copy(self.selected_ids())
             return True
-        nav = (Qt.Key.Key_Up.value, Qt.Key.Key_Down.value, Qt.Key.Key_PageUp.value, Qt.Key.Key_PageDown.value)
-        if obj is self.search and key in nav:
-            QApplication.sendEvent(self.list, ev)
+        if ctrl and key == K("Key_P"):
+            self._toggle_pin(self.selected_ids())
+            return True
+        if (ctrl and key == K("Key_E")) or key == K("Key_F2"):
+            self._edit(self.selected_ids())
+            return True
+        if key == K("Key_F3"):
+            self.toggle_preview()
+            return True
+        if key == K("Key_Delete"):
+            # While typing a search, Delete edits the text, except at the very end,
+            # where it would do nothing anyway.
+            if typing and not shift and self.search.cursorPosition() < len(self.search.text()):
+                return False
+            self._delete(self.selected_ids())
+            return True
+        nav = (K("Key_Up"), K("Key_Down"), K("Key_PageUp"), K("Key_PageDown"))
+        if in_search and (key in nav or (not typing and key in (K("Key_Home"), K("Key_End")))):
+            QApplication.sendEvent(self.list, ev)  # keeps Shift, so Shift+↓ extends the selection
             return True
         if obj is self.list and ev.text() and ev.text().isprintable() and not ctrl:
             self.search.setFocus()
@@ -217,47 +330,100 @@ class Popup(QWidget):
         return False
 
     # ---- actions ---------------------------------------------------------
-    def _keep_row(self, fn):
-        row = self.list.currentRow()
-        fn()
-        self.refresh()
-        if self.list.count():
-            self.list.setCurrentRow(min(max(row, 0), self.list.count() - 1))
+    def _ask_yes(self, title: str, question: str) -> bool:
+        self._modal = True
+        try:
+            answer = QMessageBox.question(self, title, question)
+        finally:
+            self._modal = False
+            self.activateWindow()
+        return answer == QMessageBox.StandardButton.Yes
 
-    def _set_pin(self, cid: int, pinned: bool):
-        self._keep_row(lambda: self.store.set_pinned(cid, pinned))
+    def _copy(self, ids: list[int]):
+        if ids:
+            self.copy_requested.emit(ids)
+            self.flash("Copied" if len(ids) == 1 else f"Copied {len(ids)} clips")
 
-    def _delete(self, cid: int):
-        self._thumbs.pop(cid, None)
-        self._keep_row(lambda: self.store.delete(cid))
+    def _toggle_pin(self, ids: list[int]):
+        if not ids:
+            return
+        clips = [self.store.get(i) for i in ids]
+        pin = not all(c.pinned for c in clips if c)  # pin all, unless all are already pinned
+        for i in ids:
+            self.store.set_pinned(i, pin)
+        self.refresh(keep_ids=ids)
 
-    def _move(self, cid: int, gid: int | None):
-        self._keep_row(lambda: self.store.set_group(cid, gid))
+    def _delete(self, ids: list[int]):
+        if not ids:
+            return
+        if len(ids) > 1 and not self._ask_yes(
+                "Delete clips", f"Delete {len(ids)} clips? This can't be undone."):
+            return
+        row = min(self.list.row(it) for it in self.list.selectedItems()) \
+            if self.list.selectedItems() else self.list.currentRow()
+        for i in ids:
+            self._thumbs.pop(i, None)
+            self.store.delete(i)
+        self.refresh(row=row)
+
+    def _move(self, ids: list[int], gid: int | None):
+        for i in ids:
+            self.store.set_group(i, gid)
+        self.refresh(keep_ids=ids)
+
+    def _edit(self, ids: list[int]):
+        if len(ids) != 1:
+            self.flash("Select one clip to edit")
+            return
+        clip = self.store.get(ids[0])
+        if not clip or clip.kind not in ("text", "html"):
+            self.flash("Only text clips can be edited")
+            return
+        self._modal = True
+        try:
+            text, ok = QInputDialog.getMultiLineText(self, "Edit clip", "Text:", clip.text)
+        finally:
+            self._modal = False
+            self.activateWindow()
+            self.search.setFocus()
+        if ok and text.strip() and text != clip.text:
+            new_id = self.store.update_text(clip.id, text)
+            self.refresh(keep_ids=[new_id])
 
     def _context_menu(self, pos):
         item = self.list.itemAt(pos)
         if not item:
             return
-        cid = item.data(ROLE_ID)
-        clip = self.store.get(cid)
+        if not item.isSelected():  # right-click outside the selection selects just that clip
+            self.list.clearSelection()
+            item.setSelected(True)
+            self.list.setCurrentItem(item)
+        ids = self.selected_ids()
+        clips = [self.store.get(i) for i in ids]
+        n = len(ids)
         m = QMenu(self)
-        m.addAction("Paste", lambda: self.paste_requested.emit(cid, False))
-        if clip.kind != "image":
-            m.addAction("Paste as plain text", lambda: self.paste_requested.emit(cid, True))
-        m.addAction("Unpin" if clip.pinned else "Pin", lambda: self._set_pin(cid, not clip.pinned))
+        m.addAction("Paste" if n == 1 else f"Paste {n} clips",
+                    lambda: self.paste_requested.emit(ids, False))
+        if any(c.kind != "image" for c in clips):
+            m.addAction("Paste as plain text", lambda: self.paste_requested.emit(ids, True))
+        m.addAction("Copy", lambda: self._copy(ids))
+        if n == 1 and clips[0].kind in ("text", "html"):
+            m.addAction("Edit…", lambda: self._edit(ids))
+        m.addAction("Unpin" if all(c.pinned for c in clips) else "Pin",
+                    lambda: self._toggle_pin(ids))
         gm = m.addMenu("Move to group")
-        none = gm.addAction("No group", lambda: self._move(cid, None))
+        none = gm.addAction("No group", lambda: self._move(ids, None))
         none.setCheckable(True)
-        none.setChecked(clip.group_id is None)
+        none.setChecked(all(c.group_id is None for c in clips))
         for gid, name in self.store.groups():
-            a = gm.addAction(name, lambda _=False, g=gid: self._move(cid, g))
+            a = gm.addAction(name, lambda _=False, g=gid: self._move(ids, g))
             a.setCheckable(True)
-            a.setChecked(clip.group_id == gid)
+            a.setChecked(all(c.group_id == gid for c in clips))
         gm.addSeparator()
-        gm.addAction("New group…", lambda: self._move_to_new_group(cid))
-        m.addAction("Send to other computers", lambda: self.send_requested.emit(cid))
+        gm.addAction("New group…", lambda: self._move_to_new_group(ids))
+        m.addAction("Send to other computers", lambda: self.send_requested.emit(ids))
         m.addSeparator()
-        m.addAction("Delete", lambda: self._delete(cid))
+        m.addAction("Delete" if n == 1 else f"Delete {n} clips", lambda: self._delete(ids))
         m.exec(self.list.viewport().mapToGlobal(pos))
 
     # ---- groups ----------------------------------------------------------
@@ -284,13 +450,12 @@ class Popup(QWidget):
             self.rebuild_scopes()
             self.scope.setCurrentIndex(self.scope.findData(gid))
 
-    def _move_to_new_group(self, cid: int):
+    def _move_to_new_group(self, ids: list[int]):
         name = self._ask("New group", "Group name:")
         if name:
             gid = self.store.add_group(name)
-            self.store.set_group(cid, gid)
             self.rebuild_scopes()
-            self.refresh()
+            self._move(ids, gid)
 
     def _rename_group(self):
         gid = self.scope.currentData()
@@ -307,15 +472,9 @@ class Popup(QWidget):
         if not isinstance(gid, int):
             return
         name = dict(self.store.groups()).get(gid, "")
-        self._modal = True
-        try:
-            answer = QMessageBox.question(
-                self, "Delete group",
-                f"Delete the group “{name}”? Its clips move back to the main history.")
-        finally:
-            self._modal = False
-            self.activateWindow()
-        if answer == QMessageBox.StandardButton.Yes:
+        if self._ask_yes("Delete group",
+                         f"Delete the group “{name}”? Its clips move back to the main history."):
             self.store.delete_group(gid)
             self.rebuild_scopes()
             self.refresh()
+

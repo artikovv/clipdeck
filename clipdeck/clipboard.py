@@ -80,6 +80,15 @@ def mime_from_payload(p: Payload, plain: bool = False) -> QMimeData:
     return md
 
 
+def combine(payloads: list[Payload]) -> Payload | None:
+    """Several clips pasted at once become one text, one clip per line (as in Ditto).
+    Images can't be joined with text, so they're left out."""
+    if len(payloads) == 1:
+        return payloads[0]
+    texts = [p.text for p in payloads if p.kind != "image"]
+    return Payload("text", "\n".join(texts)) if texts else None
+
+
 class ClipboardMonitor(QObject):
     captured = Signal(object)  # Payload
 

@@ -50,14 +50,21 @@ Press **Ctrl+`** in any app, pick a clip, and press **Enter**. Clipdeck puts it 
 | Key | Action |
 |---|---|
 | Type | Search (works with Cyrillic, Turkish, any language) |
-| Enter / double-click | Paste |
+| Enter / double-click | Paste the selected clip(s) |
 | Shift+Enter | Paste as plain text |
-| Ctrl+1 … Ctrl+9 | Paste one of the first nine clips |
+| Ctrl+1 … Ctrl+9 | Paste the clip with that number |
+| Delete | Delete the selected clip(s) |
+| Ctrl+A | Select all clips |
+| Shift+↑/↓, Shift+click, Ctrl+click | Select several clips |
+| Ctrl+C | Copy the selected clip(s) without pasting |
+| Ctrl+E or F2 | Edit a text clip |
 | Ctrl+P | Pin or unpin |
-| Shift+Delete | Delete |
-| Esc | Close |
+| F3 | Show or hide the preview |
+| Esc | Clear the search, or close |
 
-Right-click a clip to pin it, move it to a group, send it to another computer, or delete it. Pinned and grouped clips are never removed when the history fills up. Use the **Groups** button to create, rename, or delete groups, and the drop-down to view one.
+When you paste several clips at once, they're joined into one text, one clip per line.
+
+Right-click a clip, or several selected clips, to paste, copy, edit, pin, move to a group, send to another computer, or delete. Pinned and grouped clips are never removed when the history fills up. Use the **Groups** button to create, rename, or delete groups, and the drop-down to view one.
 
 Clipdeck records text, formatted text (HTML), images, and copied files (pasting files works in Nemo). It skips anything a password manager like KeePassXC marks as secret. To stop recording for a while, choose **Pause capturing** in the tray menu.
 

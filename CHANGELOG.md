@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Delete removes the selected clip(s); while you type a search, it still edits the search text.
+- Select several clips with Ctrl+A, Shift+arrows, Shift+click or Ctrl+click, then paste, copy, pin, move or delete them together. Pasting several clips joins them one per line.
+- Ctrl+C copies clips without pasting; Ctrl+E or F2 edits a text clip; F3 shows a preview of the full text or image.
+- Esc clears the search before closing the window.
+- Clips show their Ctrl+1–9 quick-paste number.
+- Long clips are shortened with "…" instead of adding a horizontal scrollbar.
+
 ## 0.2.0 (2026-11-24)
 
 - Sets up the keyboard shortcut automatically on Cinnamon, GNOME, MATE, Xfce and KDE.
