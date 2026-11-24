@@ -90,6 +90,7 @@ Run the tests with `pytest tests`. See [docs/PACKAGING.md](docs/PACKAGING.md) fo
 ## Author
 
 Farroukh Artikov
+Clipdeck was developed with the help of Claude, an AI assistant. Farroukh Artikov designed, tested and maintains it.
 
 ## License
 
