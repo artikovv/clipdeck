@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import time
 
-from PySide6.QtCore import QBuffer, QByteArray, QIODevice, QMimeData, QObject, Qt, QUrl, Signal
-from PySide6.QtGui import QGuiApplication, QImage, QPixmap
+from .qt import QBuffer, QByteArray, QIODevice, QMimeData, QObject, Qt, QUrl, Signal
+from .qt import QGuiApplication, QImage, QPixmap
 
 from .storage import Payload
 
@@ -16,7 +16,7 @@ GNOME_FILES = "x-special/gnome-copied-files"
 
 def image_to_png(img: QImage) -> bytes:
     buf = QBuffer()
-    buf.open(QIODevice.WriteOnly)
+    buf.open(QIODevice.OpenModeFlag.WriteOnly)
     img.save(buf, "PNG")
     return bytes(buf.data())
 
@@ -27,7 +27,7 @@ def make_thumb(png: bytes | None, size: int = 96) -> bytes | None:
     img = QImage.fromData(png, "PNG")
     if img.isNull():
         return None
-    return image_to_png(img.scaled(size, size, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+    return image_to_png(img.scaled(size, size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
 
 
 def payload_from_mime(md: QMimeData | None, max_image_bytes: int) -> Payload | None:

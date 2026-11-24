@@ -4,16 +4,16 @@ from __future__ import annotations
 import html
 import os
 
-from PySide6.QtCore import QEvent, QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QCursor, QGuiApplication, QIcon, QPixmap
-from PySide6.QtWidgets import (QApplication, QComboBox, QFrame, QHBoxLayout, QInputDialog, QLabel,
+from .qt import QEvent, QSize, Qt, QTimer, Signal
+from .qt import QCursor, QGuiApplication, QIcon, QPixmap
+from .qt import (QApplication, QComboBox, QFrame, QHBoxLayout, QInputDialog, QLabel,
                                QLineEdit, QListWidget, QListWidgetItem, QMenu, QMessageBox,
                                QToolButton, QVBoxLayout, QWidget)
 
 from . import x11
 from .storage import Storage
 
-ROLE_ID = Qt.UserRole
+ROLE_ID = Qt.ItemDataRole.UserRole
 
 STYLE = """
 #frame { background: palette(window); border: 1px solid palette(mid); border-radius: 8px; }
@@ -33,11 +33,11 @@ class Popup(QWidget):
     send_requested = Signal(int)
 
     def __init__(self, store: Storage):
-        super().__init__(None, Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        super().__init__(None, Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
         self.store = store
         self._modal = False
         self._thumbs: dict[int, QIcon] = {}
-        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setStyleSheet(STYLE)
         self.resize(500, 560)
 
@@ -53,7 +53,7 @@ class Popup(QWidget):
         self.scope = QComboBox()
         self.scope.currentIndexChanged.connect(self.refresh)
         self.groups_btn = QToolButton(text="Groups")
-        self.groups_btn.setPopupMode(QToolButton.InstantPopup)
+        self.groups_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         gm = QMenu(self.groups_btn)
         gm.addAction("New group…", self._new_group)
         self.rename_act = gm.addAction("Rename group…", self._rename_group)
@@ -73,7 +73,7 @@ class Popup(QWidget):
 
         self.list = QListWidget()
         self.list.setIconSize(QSize(48, 48))
-        self.list.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.list.customContextMenuRequested.connect(self._context_menu)
         self.list.itemActivated.connect(lambda it: self.paste_requested.emit(it.data(ROLE_ID), False))
         lay.addWidget(self.list, 1)
@@ -113,7 +113,7 @@ class Popup(QWidget):
             x11.force_focus(int(self.winId()))
 
     def changeEvent(self, e):
-        if e.type() == QEvent.ActivationChange and not self.isActiveWindow():
+        if e.type() == QEvent.Type.ActivationChange and not self.isActiveWindow():
             QTimer.singleShot(200, self._hide_if_unfocused)
         super().changeEvent(e)
 
@@ -177,36 +177,37 @@ class Popup(QWidget):
 
     # ---- keyboard --------------------------------------------------------
     def eventFilter(self, obj, ev):
-        if ev.type() != QEvent.KeyPress:
+        if ev.type() != QEvent.Type.KeyPress:
             return False
-        key, mods = ev.key(), ev.modifiers()
-        ctrl, shift = bool(mods & Qt.ControlModifier), bool(mods & Qt.ShiftModifier)
+        key, mods = int(ev.key()), ev.modifiers()
+        ctrl, shift = bool(mods & Qt.KeyboardModifier.ControlModifier), bool(mods & Qt.KeyboardModifier.ShiftModifier)
 
-        if key == Qt.Key_Escape:
+        if key == Qt.Key.Key_Escape.value:
             self.hide()
             return True
-        if key in (Qt.Key_Return, Qt.Key_Enter):
+        if key in (Qt.Key.Key_Return.value, Qt.Key.Key_Enter.value):
             cid = self._current_id()
             if cid is not None:
                 self.paste_requested.emit(cid, shift)
             return True
-        if ctrl and Qt.Key_1 <= key <= Qt.Key_9:
-            row = int(key) - int(Qt.Key_1)
+        if ctrl and Qt.Key.Key_1.value <= key <= Qt.Key.Key_9.value:
+            row = key - Qt.Key.Key_1.value
             if row < self.list.count():
                 self.paste_requested.emit(self.list.item(row).data(ROLE_ID), shift)
             return True
-        if ctrl and key == Qt.Key_P:
+        if ctrl and key == Qt.Key.Key_P.value:
             cid = self._current_id()
             if cid is not None:
                 clip = self.store.get(cid)
                 self._set_pin(cid, not clip.pinned)
             return True
-        if shift and key == Qt.Key_Delete:
+        if shift and key == Qt.Key.Key_Delete.value:
             cid = self._current_id()
             if cid is not None:
                 self._delete(cid)
             return True
-        if obj is self.search and key in (Qt.Key_Up, Qt.Key_Down, Qt.Key_PageUp, Qt.Key_PageDown):
+        nav = (Qt.Key.Key_Up.value, Qt.Key.Key_Down.value, Qt.Key.Key_PageUp.value, Qt.Key.Key_PageDown.value)
+        if obj is self.search and key in nav:
             QApplication.sendEvent(self.list, ev)
             return True
         if obj is self.list and ev.text() and ev.text().isprintable() and not ctrl:
@@ -314,7 +315,7 @@ class Popup(QWidget):
         finally:
             self._modal = False
             self.activateWindow()
-        if answer == QMessageBox.Yes:
+        if answer == QMessageBox.StandardButton.Yes:
             self.store.delete_group(gid)
             self.rebuild_scopes()
             self.refresh()

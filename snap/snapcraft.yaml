@@ -1,0 +1,50 @@
+name: clipdeck
+base: core24
+version: '0.2.0'
+title: Clipdeck
+summary: Clipboard history manager with search, pins and sync
+description: |
+  Clipdeck remembers what you copy so you can paste it again later. Press a
+  shortcut, type a few letters to find a clip, and press Enter to paste it
+  into the window you were using. It keeps text, formatted text, images and
+  copied files, lets you pin clips and sort them into groups, and can sync
+  clips between computers over an encrypted connection.
+
+  Works on X11 desktops. After installing, add a keyboard shortcut in your
+  desktop's settings that runs: clipdeck --show
+license: MIT
+grade: stable
+confinement: strict
+icon: data/io.github.GHUSER.Clipdeck.svg
+
+apps:
+  clipdeck:
+    command: bin/clipdeck
+    desktop: share/applications/io.github.GHUSER.Clipdeck.desktop
+    common-id: io.github.GHUSER.Clipdeck
+    # The PySide6 wheel brings its own Qt, so no Qt/KDE extension.
+    extensions: [gnome]
+    environment:
+      QT_QPA_PLATFORM: xcb
+    plugs: [x11, desktop, desktop-legacy, network, network-bind, unity7, home]
+
+parts:
+  clipdeck:
+    plugin: python
+    source: .
+    python-packages:
+      - PySide6-Essentials>=6.6
+    stage-packages:
+      - xdotool
+      - x11-utils
+      - libxcb-cursor0
+      - libxcb-icccm4
+      - libxcb-image0
+      - libxcb-keysyms1
+      - libxcb-render-util0
+      - libxcb-xkb1
+      - libxkbcommon-x11-0
+    override-build: |
+      craftctl default
+      install -Dm644 data/io.github.GHUSER.Clipdeck.desktop $CRAFT_PART_INSTALL/share/applications/io.github.GHUSER.Clipdeck.desktop
+      sed -i 's|^Icon=.*|Icon=${SNAP}/meta/gui/icon.svg|' $CRAFT_PART_INSTALL/share/applications/io.github.GHUSER.Clipdeck.desktop

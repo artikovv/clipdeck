@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Clipdeck
+GenericName=Clipboard Manager
+Comment=Keep a searchable history of everything you copy
+Exec=clipdeck
+Icon=io.github.GHUSER.Clipdeck
+Terminal=false
+Categories=Utility;Qt;
+Keywords=clipboard;history;copy;paste;
+StartupNotify=false

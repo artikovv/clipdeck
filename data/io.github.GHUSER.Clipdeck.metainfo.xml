@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.GHUSER.Clipdeck</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Clipdeck</name>
+  <summary>Keep a searchable history of everything you copy</summary>
+  <developer id="io.github.GHUSER">
+    <name>Farroukh Artikov</name>
+  </developer>
+  <description>
+    <p>
+      Clipdeck remembers what you copy so you can paste it again later. Press a
+      shortcut, type a few letters to find a clip, and press Enter to paste it
+      into the window you were using.
+    </p>
+    <ul>
+      <li>Keeps text, formatted text, images and copied files</li>
+      <li>Searches in any language</li>
+      <li>Pin clips you use often and sort them into groups</li>
+      <li>Paste formatted text as plain text</li>
+      <li>Syncs clips between your computers over an encrypted connection</li>
+      <li>Skips passwords that password managers mark as secret</li>
+    </ul>
+    <p>Clipdeck works on desktops that use X11, such as Cinnamon, Xfce and MATE.</p>
+  </description>
+  <launchable type="desktop-id">io.github.GHUSER.Clipdeck.desktop</launchable>
+  <url type="homepage">https://github.com/GHUSER/clipdeck</url>
+  <url type="bugtracker">https://github.com/GHUSER/clipdeck/issues</url>
+  <url type="vcs-browser">https://github.com/GHUSER/clipdeck</url>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Clipboard history with search</caption>
+      <image>https://raw.githubusercontent.com/GHUSER/clipdeck/main/docs/screenshot.png</image>
+    </screenshot>
+  </screenshots>
+  <provides>
+    <binary>clipdeck</binary>
+  </provides>
+  <requires>
+    <display_length compare="ge">768</display_length>
+  </requires>
+  <supports>
+    <control>keyboard</control>
+    <control>pointing</control>
+  </supports>
+  <categories>
+    <category>Utility</category>
+  </categories>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.2.0" date="2026-11-24">
+      <description>
+        <ul>
+          <li>Sets up the keyboard shortcut on Cinnamon, GNOME, MATE, Xfce and KDE</li>
+          <li>Installs on Debian, Ubuntu, Mint, Fedora, openSUSE and Arch</li>
+          <li>Available as Flatpak, Snap, AppImage, .deb and .rpm</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.1.0" date="2026-11-24">
+      <description><p>First release.</p></description>
+    </release>
+  </releases>
+</component>

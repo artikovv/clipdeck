@@ -1,9 +1,9 @@
 """Configuration (~/.config/clipdeck/clipdeck.conf) and the settings dialog."""
 from __future__ import annotations
 
-from PySide6.QtCore import QSettings, Qt
-from PySide6.QtNetwork import QAbstractSocket, QNetworkInterface
-from PySide6.QtWidgets import (QCheckBox, QDialog, QDialogButtonBox, QFormLayout, QLabel,
+from .qt import QSettings, Qt
+from .qt import QAbstractSocket, QNetworkInterface
+from .qt import (QCheckBox, QDialog, QDialogButtonBox, QFormLayout, QLabel,
                                QLineEdit, QMessageBox, QSpinBox, QTabWidget, QVBoxLayout, QWidget)
 
 DEFAULTS = {
@@ -66,7 +66,7 @@ class SettingsDialog(QDialog):
         f = QFormLayout(general)
         self.hotkey = QLineEdit(cfg.get("hotkey"))
         f.addRow("Shortcut", self.hotkey)
-        hint = QLabel("Cinnamon format, for example <Primary>grave (Ctrl+`), "
+        hint = QLabel("For example <Primary>grave (Ctrl+`), "
                       "<Primary><Alt>v or <Super>v.")
         hint.setWordWrap(True)
         f.addRow("", hint)
@@ -95,7 +95,7 @@ class SettingsDialog(QDialog):
         self.peers.setPlaceholderText("192.168.1.20, office-pc.local:47811")
         s.addRow("Other computers", self.peers)
         self.passphrase = QLineEdit(cfg.get("sync_passphrase"))
-        self.passphrase.setEchoMode(QLineEdit.Password)
+        self.passphrase.setEchoMode(QLineEdit.EchoMode.Password)
         self.passphrase.setPlaceholderText("Same passphrase on every computer")
         s.addRow("Passphrase", self.passphrase)
         self.sync_auto = QCheckBox("Send every copy automatically")
@@ -105,11 +105,11 @@ class SettingsDialog(QDialog):
         self.sync_clip.setChecked(cfg.get("sync_to_clipboard"))
         s.addRow("", self.sync_clip)
         me = QLabel(f"This computer: {local_addresses()}")
-        me.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        me.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         s.addRow("", me)
         tabs.addTab(sync, "Sync")
 
-        buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout = QVBoxLayout(self)

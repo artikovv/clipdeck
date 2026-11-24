@@ -1,22 +1,47 @@
 # Clipdeck
 
-Version 0.1.0 · by Farroukh Artikov
+Version 0.2.0 · by Farroukh Artikov
 
-A clipboard history manager for Linux, inspired by [Ditto](https://ditto-cp.sourceforge.io/) on Windows. Built for Linux Mint (Cinnamon, X11) and should work on other X11 desktops.
+A clipboard history manager for Linux, inspired by [Ditto](https://ditto-cp.sourceforge.io/) on Windows.
 
 **Features:** searchable history of text, formatted text, images and files · pinned clips and groups · paste as plain text · encrypted sync between computers on your network.
 
-**Requirements:** Linux with an X11 session, Python 3.10+.
+**Requirements:** a Linux desktop running X11 (see [Supported desktops](#supported-desktops)).
 
 ## Install
 
+Download a package for your system from the [latest release](https://github.com/GHUSER/clipdeck/releases/latest):
+
+| System | Package | Install |
+|---|---|---|
+| Debian, Ubuntu, Linux Mint | `clipdeck_*_all.deb` | `sudo apt install ./clipdeck_*_all.deb` |
+| Fedora | `clipdeck-*.noarch.rpm` | `sudo dnf install ./clipdeck-*.noarch.rpm` |
+| Any distro | `Clipdeck.flatpak` | `flatpak install --user Clipdeck.flatpak` |
+| Any distro | `Clipdeck-*.AppImage` | `chmod +x Clipdeck-*.AppImage` and run it |
+| Ubuntu and others with Snap | `clipdeck_*.snap` | `sudo snap install --dangerous ./clipdeck_*.snap` |
+
+Or install from source (Debian, Ubuntu, Mint, Fedora, openSUSE, Arch):
+
 ```bash
-git clone https://github.com/YOUR-USERNAME/clipdeck.git
+git clone https://github.com/GHUSER/clipdeck.git
 cd clipdeck
 ./install.sh
 ```
 
-Clipdeck starts in the system tray and registers **Ctrl+`** as a Cinnamon keyboard shortcut. It also starts automatically when you log in.
+Clipdeck starts in the system tray and adds a **Ctrl+`** keyboard shortcut. With Flatpak, Snap and AppImage, add the shortcut yourself in your desktop's keyboard settings; the command is shown when Clipdeck first starts.
+
+## Supported desktops
+
+| Desktop | Works | Shortcut set up automatically |
+|---|---|---|
+| Cinnamon (Linux Mint) | Yes | Yes |
+| MATE | Yes | Yes |
+| Xfce | Yes | Yes |
+| KDE Plasma (X11 session) | Yes | Yes, after logging out and back in |
+| GNOME (X11 session) | Yes | Yes |
+| Wayland sessions (GNOME, KDE, Sway…) | Not yet | — |
+
+Recent Fedora Workstation and Ubuntu releases run GNOME only on Wayland. Wayland support is planned for version 0.3.0.
 
 ## Use
 
@@ -52,11 +77,15 @@ Clips are encrypted with a key made from the passphrase. Each computer's clock n
 
 ## Troubleshooting
 
-- **Shortcut does nothing:** check System Settings → Keyboard → Shortcuts → Custom Shortcuts for "Clipdeck". Another app may already use Ctrl+`; change it in Clipdeck's Settings.
+- **Shortcut does nothing:** look for "Clipdeck" in your desktop's custom keyboard shortcuts. Another app may already use Ctrl+`; change it in Clipdeck's Settings.
 - **Clip is copied but not pasted:** make sure `xdotool` is installed. Terminals need Ctrl+Shift+V; add your terminal's window class to Settings → General if it isn't listed (find it with `xprop WM_CLASS`, then click the terminal).
 - **See error messages:** run `clipdeck --quit`, then `clipdeck` in a terminal.
 
-Uninstall with `./uninstall.sh`.
+If you installed from source, uninstall with `./uninstall.sh`. Packages uninstall with your package manager.
+
+## Contributing
+
+Run the tests with `pytest tests`. See [docs/PACKAGING.md](docs/PACKAGING.md) for how packages are built and published.
 
 ## Author
 

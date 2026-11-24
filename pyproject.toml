@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "clipdeck"
+dynamic = ["version"]
+description = "A Ditto-style clipboard history manager for Linux"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Farroukh Artikov" }]
+requires-python = ">=3.10"
+dependencies = ["PySide6>=6.6", "cryptography>=41"]
+keywords = ["clipboard", "clipboard-manager", "linux", "qt", "x11"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: X11 Applications :: Qt",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Topic :: Desktop Environment",
+    "Topic :: Utilities",
+]
+
+[project.urls]
+Homepage = "https://github.com/GHUSER/clipdeck"
+Issues = "https://github.com/GHUSER/clipdeck/issues"
+
+[project.scripts]
+clipdeck = "clipdeck.__main__:main"
+
+[tool.setuptools]
+packages = ["clipdeck"]
+
+[tool.setuptools.dynamic]
+version = { attr = "clipdeck.__version__" }

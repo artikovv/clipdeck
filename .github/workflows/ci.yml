@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: Tests (${{ matrix.binding }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        # pyside6: pip, Flatpak, Snap, AppImage, Fedora, Arch. pyqt6: Debian/Ubuntu/Mint packages.
+        binding: [pyside6, pyqt6]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install system packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-venv python3-pytest python3-cryptography \
+            python3-pyqt6 libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3
+      - name: Run tests with PySide6
+        if: matrix.binding == 'pyside6'
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install . pytest
+          CLIPDECK_QT=pyside6 .venv/bin/python -m pytest -v tests
+      - name: Run tests with PyQt6
+        if: matrix.binding == 'pyqt6'
+        run: CLIPDECK_QT=pyqt6 python3 -m pytest -v tests
+
+  metadata:
+    name: Validate desktop and AppStream files
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y desktop-file-utils appstream
+      - run: desktop-file-validate data/*.desktop
+      - run: appstreamcli validate --no-net data/*.metainfo.xml

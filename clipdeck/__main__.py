@@ -15,6 +15,9 @@ USAGE = """usage: clipdeck [--show | --background | --quit]
 
 def ipc_path() -> str:
     base = os.environ.get("XDG_RUNTIME_DIR") or tempfile.gettempdir()
+    if os.environ.get("FLATPAK_ID"):
+        # Each `flatpak run` gets its own sandbox; this folder is shared between them.
+        base = os.path.join(base, "app", os.environ["FLATPAK_ID"])
     return os.path.join(base, f"clipdeck-{os.getuid()}.sock")
 
 

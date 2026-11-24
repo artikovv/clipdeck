@@ -1,0 +1,28 @@
+# Maintainer: Farroukh Artikov <GHEMAIL>
+pkgname=clipdeck
+pkgver=0.2.0
+pkgrel=1
+pkgdesc="Clipboard history manager with search, pins and sync"
+arch=('any')
+url="https://github.com/GHUSER/clipdeck"
+license=('MIT')
+depends=('python' 'pyside6' 'python-cryptography' 'xdotool' 'xorg-xprop' 'hicolor-icon-theme')
+makedepends=('python-build' 'python-installer' 'python-setuptools' 'python-wheel')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
+sha256sums=('SKIP')  # scripts/release-hashes.sh fills this in after tagging
+
+build() {
+  cd "$pkgname-$pkgver"
+  python -m build --wheel --no-isolation
+}
+
+package() {
+  cd "$pkgname-$pkgver"
+  local appid=io.github.GHUSER.Clipdeck
+  python -m installer --destdir="$pkgdir" dist/*.whl
+  install -Dm644 "data/$appid.desktop" "$pkgdir/usr/share/applications/$appid.desktop"
+  install -Dm644 "data/$appid.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/$appid.svg"
+  install -Dm644 "data/$appid.metainfo.xml" "$pkgdir/usr/share/metainfo/$appid.metainfo.xml"
+  install -Dm644 docs/clipdeck.1 "$pkgdir/usr/share/man/man1/clipdeck.1"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

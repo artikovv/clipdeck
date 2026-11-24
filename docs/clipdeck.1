@@ -1,0 +1,39 @@
+.TH CLIPDECK 1 "November 2026" "Clipdeck 0.2.0" "User Commands"
+.SH NAME
+clipdeck \- clipboard history manager
+.SH SYNOPSIS
+.B clipdeck
+[\fB\-\-show\fR | \fB\-\-background\fR | \fB\-\-quit\fR | \fB\-\-version\fR]
+.SH DESCRIPTION
+Clipdeck keeps a searchable history of everything you copy. It runs in the
+system tray; press its keyboard shortcut (Ctrl+` by default) to open the
+history, type to search, and press Enter to paste.
+.SH OPTIONS
+.TP
+.B (none)
+Start Clipdeck, or open the history if it is already running.
+.TP
+.B \-\-show
+Open the history window. Bind this to a keyboard shortcut.
+.TP
+.B \-\-background
+Start without showing anything if Clipdeck isn't running (used at login).
+.TP
+.B \-\-quit
+Stop the running instance.
+.TP
+.B \-\-version
+Print the version.
+.SH FILES
+.TP
+.I ~/.local/share/clipdeck/clips.db
+Clipboard history.
+.TP
+.I ~/.config/clipdeck/clipdeck.conf
+Settings, including the sync passphrase.
+.SH ENVIRONMENT
+.TP
+.B CLIPDECK_QT
+Set to \fBpyside6\fR or \fBpyqt6\fR to choose the Qt binding.
+.SH AUTHOR
+Farroukh Artikov

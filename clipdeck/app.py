@@ -5,12 +5,12 @@ import signal
 import sys
 import time
 
-from PySide6.QtCore import QObject, Qt, QTimer
-from PySide6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap
-from PySide6.QtNetwork import QLocalServer
-from PySide6.QtWidgets import QApplication, QMenu, QMessageBox, QSystemTrayIcon
+from .qt import QObject, Qt, QTimer
+from .qt import QAction, QColor, QIcon, QPainter, QPixmap
+from .qt import QLocalServer
+from .qt import QApplication, QMenu, QMessageBox, QSystemTrayIcon
 
-from . import __author__, __version__, desktop, x11
+from . import APP_ID, __author__, __version__, desktop, x11
 from .clipboard import ClipboardMonitor, make_thumb
 from .popup import Popup
 from .settings import Config, SettingsDialog
@@ -19,14 +19,15 @@ from .sync import SyncService
 
 
 def app_icon() -> QIcon:
-    icon = QIcon.fromTheme("edit-paste")
-    if not icon.isNull():
-        return icon
+    for name in (APP_ID, "edit-paste"):
+        icon = QIcon.fromTheme(name)
+        if not icon.isNull():
+            return icon
     pm = QPixmap(64, 64)
-    pm.fill(Qt.transparent)
+    pm.fill(Qt.GlobalColor.transparent)
     p = QPainter(pm)
-    p.setRenderHint(QPainter.Antialiasing)
-    p.setPen(Qt.NoPen)
+    p.setRenderHint(QPainter.RenderHint.Antialiasing)
+    p.setPen(Qt.PenStyle.NoPen)
     p.setBrush(QColor("#4a7fc1"))
     p.drawRoundedRect(8, 6, 48, 54, 8, 8)
     p.setBrush(QColor("#ffffff"))
@@ -64,7 +65,7 @@ class Clipdeck(QObject):
         if x11.is_wayland():
             self.notify("You're in a Wayland session. Clipdeck is built for X11 (Cinnamon's default), "
                         "so capturing and auto-paste may not work.")
-        elif not x11.have_xdotool():
+        elif not x11.have_xdotool() and self.cfg.get("auto_paste"):
             self.notify("Install xdotool to paste automatically: sudo apt install xdotool")
 
     # ---- tray ------------------------------------------------------------
@@ -88,7 +89,7 @@ class Clipdeck(QObject):
         self.tray.setContextMenu(menu)
         self.tray.activated.connect(
             lambda reason: self.show_popup(from_tray=True)
-            if reason == QSystemTrayIcon.Trigger else None)
+            if reason == QSystemTrayIcon.ActivationReason.Trigger else None)
         self.tray.show()
 
     def notify(self, message: str):
@@ -98,7 +99,7 @@ class Clipdeck(QObject):
             return
         self._last_notice[message] = now
         print(f"clipdeck: {message}", file=sys.stderr)
-        self.tray.showMessage("Clipdeck", message, QSystemTrayIcon.Information, 6000)
+        self.tray.showMessage("Clipdeck", message, QSystemTrayIcon.MessageIcon.Information, 6000)
 
     def _set_paused(self, paused: bool):
         self.monitor.paused = paused
@@ -107,7 +108,7 @@ class Clipdeck(QObject):
     def _clear_history(self):
         answer = QMessageBox.question(None, "Clear history",
                                       "Delete all clips except pinned and grouped ones?")
-        if answer == QMessageBox.Yes:
+        if answer == QMessageBox.StandardButton.Yes:
             self.store.clear_loose()
             if self.popup.isVisible():
                 self.popup.refresh()
@@ -118,14 +119,16 @@ class Clipdeck(QObject):
             self.apply_settings()
 
     def apply_settings(self):
-        hotkey = self.cfg.get("hotkey")
-        if hotkey != self.cfg.get("registered_hotkey"):
-            ok, msg = desktop.register_shortcut(hotkey, desktop.launch_command() + " --show")
-            if ok:
-                self.cfg.set("registered_hotkey", hotkey)
+        hotkey, old = self.cfg.get("hotkey"), self.cfg.get("registered_hotkey")
+        if hotkey != old:
+            ok, msg = desktop.register_shortcut(hotkey, desktop.launch_command(), old)
+            # Remember failures too, so the same message doesn't repeat every start.
+            self.cfg.set("registered_hotkey", hotkey)
             self.notify(msg)
         try:
-            desktop.set_autostart(self.cfg.get("autostart"))
+            msg = desktop.set_autostart(self.cfg.get("autostart"))
+            if msg:
+                self.notify(msg)
         except OSError as e:
             self.notify(f"Couldn't update autostart: {e}")
         self.store.trim(self.cfg.get("max_items"))
@@ -206,12 +209,13 @@ class Clipdeck(QObject):
 def run(ipc_path: str, show_now: bool = False, background: bool = False) -> int:
     app = QApplication(sys.argv)
     app.setApplicationName("Clipdeck")
+    app.setDesktopFileName(APP_ID)
     app.setQuitOnLastWindowClosed(False)
     signal.signal(signal.SIGINT, signal.SIG_DFL)
 
     QLocalServer.removeServer(ipc_path)  # a stale socket from a crash
     server = QLocalServer()
-    server.setSocketOptions(QLocalServer.UserAccessOption)
+    server.setSocketOptions(QLocalServer.SocketOption.UserAccessOption)
     if not server.listen(ipc_path):
         print(f"clipdeck: can't listen on {ipc_path}: {server.errorString()}", file=sys.stderr)
         return 1

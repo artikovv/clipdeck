@@ -17,8 +17,8 @@ import uuid
 from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from PySide6.QtCore import QObject, Signal
-from PySide6.QtNetwork import QHostAddress, QTcpServer, QTcpSocket
+from .qt import QObject, Signal
+from .qt import QHostAddress, QTcpServer, QTcpSocket
 
 from .storage import Payload
 
@@ -73,7 +73,7 @@ class SyncService(QObject):
         self.peers = parse_peers(peers, port)
         self.server = QTcpServer(self)
         self.server.newConnection.connect(self._on_connection)
-        if not self.server.listen(QHostAddress.Any, port):
+        if not self.server.listen(QHostAddress.SpecialAddress.Any, port):
             self.status.emit(f"Sync couldn't listen on port {port}: {self.server.errorString()}")
             self.server = None
             return False

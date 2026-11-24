@@ -1,0 +1,137 @@
+name: Release
+
+# Push a tag like v0.2.0 to build every package and attach it to a GitHub Release.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  check-version:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        run: |
+          version=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' clipdeck/__init__.py)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_REF_TYPE" == tag && "$GITHUB_REF_NAME" != "v$version" ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME doesn't match version $version in clipdeck/__init__.py"
+            exit 1
+          fi
+          if grep -q GHUSER clipdeck/__init__.py; then
+            echo "::error::Run scripts/set-owner.sh first"
+            exit 1
+          fi
+
+  python:
+    name: Wheel and source
+    needs: check-version
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: pipx run build
+      - uses: actions/upload-artifact@v4
+        with: { name: python, path: dist/* }
+
+  deb:
+    name: Debian / Ubuntu / Mint (.deb)
+    needs: check-version
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y debhelper dh-python pybuild-plugin-pyproject python3-all python3-setuptools
+      - run: dpkg-buildpackage -b -us -uc && mkdir out && mv ../*.deb out/
+      - uses: actions/upload-artifact@v4
+        with: { name: deb, path: out/*.deb }
+
+  rpm:
+    name: Fedora (.rpm)
+    needs: check-version
+    runs-on: ubuntu-24.04
+    container: fedora:latest
+    steps:
+      - run: dnf install -y git rpm-build pyproject-rpm-macros python3-devel python3-pip python3-setuptools python3-wheel desktop-file-utils libappstream-glib
+      - uses: actions/checkout@v4
+      - run: |
+          v=${{ needs.check-version.outputs.version }}
+          mkdir -p ~/rpmbuild/SOURCES
+          git config --global --add safe.directory "$PWD"
+          git archive --prefix=clipdeck-$v/ -o ~/rpmbuild/SOURCES/clipdeck-$v.tar.gz HEAD
+          rpmbuild -bb packaging/rpm/clipdeck.spec
+          mkdir out && cp ~/rpmbuild/RPMS/noarch/*.rpm out/
+      - uses: actions/upload-artifact@v4
+        with: { name: rpm, path: out/*.rpm }
+
+  appimage:
+    name: AppImage
+    needs: check-version
+    # Build on the oldest supported Ubuntu so the AppImage runs on older systems.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y python3-venv libfuse2
+      - run: packaging/appimage/build.sh
+      - uses: actions/upload-artifact@v4
+        with: { name: appimage, path: dist/*.AppImage }
+
+  flatpak:
+    name: Flatpak bundle
+    needs: check-version
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:kde-6.10
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+      - id: manifest
+        run: echo "path=$(ls packaging/flatpak/*.yml)" >> "$GITHUB_OUTPUT"
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: Clipdeck.flatpak
+          manifest-path: ${{ steps.manifest.outputs.path }}
+          cache-key: flatpak-${{ github.sha }}
+
+  snap:
+    name: Snap
+    needs: check-version
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: snapcore/action-build@v1
+        id: build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: snap
+          path: ${{ steps.build.outputs.snap }}
+      # To publish to the Snap Store, add a SNAPCRAFT_STORE_CREDENTIALS secret and uncomment:
+      # - uses: snapcore/action-publish@v1
+      #   env: { SNAPCRAFT_STORE_CREDENTIALS: '${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}' }
+      #   with: { snap: '${{ steps.build.outputs.snap }}', release: stable }
+
+  release:
+    name: GitHub Release
+    needs: [check-version, python, deb, rpm, appimage, flatpak, snap]
+    # Attach whatever built, even if one packager failed.
+    if: always() && needs.check-version.result == 'success' && startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { path: artifacts, merge-multiple: true }
+      - name: Release notes from CHANGELOG.md
+        run: |
+          v=${{ needs.check-version.outputs.version }}
+          awk -v v="$v" '$0 ~ "^## " v {f=1; next} /^## / {f=0} f' CHANGELOG.md > notes.md
+      - uses: softprops/action-gh-release@v2
+        with:
+          body_path: notes.md
+          files: artifacts/*
+          fail_on_unmatched_files: false

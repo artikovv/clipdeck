@@ -1,0 +1,15 @@
+#!/usr/bin/make -f
+export PYBUILD_NAME=clipdeck
+# Use the distro's PyQt6 (Debian and Ubuntu don't package PySide6).
+export PYBUILD_TEST_ARGS=-q tests
+export CLIPDECK_QT=pyqt6
+
+%:
+	dh $@ --with python3 --buildsystem=pybuild
+
+# Dependencies are listed by hand in debian/control.
+override_dh_python3:
+	dh_python3 --no-guessing-deps
+
+# The tests need a display and network; they run in CI instead.
+override_dh_auto_test:

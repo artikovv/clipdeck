@@ -30,8 +30,12 @@ def active_window() -> str | None:
 
 
 def window_classes(wid: str) -> set[str]:
-    out = _run(["xprop", "-id", wid, "WM_CLASS"])
-    return {c.lower() for c in re.findall(r'"([^"]*)"', out)}
+    if shutil.which("xprop"):
+        out = _run(["xprop", "-id", wid, "WM_CLASS"])
+        return {c.lower() for c in re.findall(r'"([^"]*)"', out)}
+    # Newer xdotool can report the class itself (used inside Flatpak).
+    name = _run(["xdotool", "getwindowclassname", wid])
+    return {name.lower()} if name else set()
 
 
 def paste_into(wid: str, terminal_classes: set[str]):
