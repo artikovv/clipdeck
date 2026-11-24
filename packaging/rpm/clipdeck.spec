@@ -1,11 +1,11 @@
-%global appid io.github.GHUSER.Clipdeck
+%global appid io.github.artikovv.Clipdeck
 
 Name:           clipdeck
 Version:        0.2.0
 Release:        1%{?dist}
 Summary:        Clipboard history manager with search, pins and sync
 License:        MIT
-URL:            https://github.com/GHUSER/clipdeck
+URL:            https://github.com/artikovv/clipdeck
 Source0:        %{url}/archive/v%{version}/%{name}-%{version}.tar.gz
 BuildArch:      noarch
 
@@ -58,6 +58,6 @@ appstream-util validate-relax --nonet %{buildroot}%{_metainfodir}/%{appid}.metai
 %{_mandir}/man1/clipdeck.1*
 
 %changelog
-* Tue Nov 24 2026 Farroukh Artikov <GHEMAIL> - 0.2.0-1
+* Tue Nov 24 2026 Farroukh Artikov <farroukh@gmail.com> - 0.2.0-1
 - Shortcut setup for Cinnamon, GNOME, MATE, Xfce and KDE
 - Packages for major distros, Flatpak, Snap and AppImage

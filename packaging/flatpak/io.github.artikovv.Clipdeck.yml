@@ -1,6 +1,6 @@
 # Flathub manifest. Build locally with:
-#   flatpak-builder --user --install --force-clean build-dir packaging/flatpak/io.github.GHUSER.Clipdeck.yml
-app-id: io.github.GHUSER.Clipdeck
+#   flatpak-builder --user --install --force-clean build-dir packaging/flatpak/io.github.artikovv.Clipdeck.yml
+app-id: io.github.artikovv.Clipdeck
 runtime: org.kde.Platform
 runtime-version: '6.10'
 sdk: org.kde.Sdk
@@ -66,13 +66,13 @@ modules:
     buildsystem: simple
     build-commands:
       - pip3 install --no-index --no-deps --no-build-isolation --prefix=/app .
-      - install -Dm644 data/io.github.GHUSER.Clipdeck.desktop /app/share/applications/io.github.GHUSER.Clipdeck.desktop
-      - install -Dm644 data/io.github.GHUSER.Clipdeck.svg /app/share/icons/hicolor/scalable/apps/io.github.GHUSER.Clipdeck.svg
-      - install -Dm644 data/io.github.GHUSER.Clipdeck.metainfo.xml /app/share/metainfo/io.github.GHUSER.Clipdeck.metainfo.xml
+      - install -Dm644 data/io.github.artikovv.Clipdeck.desktop /app/share/applications/io.github.artikovv.Clipdeck.desktop
+      - install -Dm644 data/io.github.artikovv.Clipdeck.svg /app/share/icons/hicolor/scalable/apps/io.github.artikovv.Clipdeck.svg
+      - install -Dm644 data/io.github.artikovv.Clipdeck.metainfo.xml /app/share/metainfo/io.github.artikovv.Clipdeck.metainfo.xml
     sources:
       # For the Flathub submission, replace this with the release tarball:
       #   - type: archive
-      #     url: https://github.com/GHUSER/clipdeck/archive/refs/tags/v0.2.0.tar.gz
+      #     url: https://github.com/artikovv/clipdeck/archive/refs/tags/v0.2.0.tar.gz
       #     sha256: <printed by scripts/release-hashes.sh>
       - type: dir
         path: ../..

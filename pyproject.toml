@@ -24,8 +24,8 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/GHUSER/clipdeck"
-Issues = "https://github.com/GHUSER/clipdeck/issues"
+Homepage = "https://github.com/artikovv/clipdeck"
+Issues = "https://github.com/artikovv/clipdeck/issues"
 
 [project.scripts]
 clipdeck = "clipdeck.__main__:main"

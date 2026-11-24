@@ -24,7 +24,7 @@ jobs:
             echo "::error::Tag $GITHUB_REF_NAME doesn't match version $version in clipdeck/__init__.py"
             exit 1
           fi
-          if grep -q GHUSER clipdeck/__init__.py; then
+          if grep -q artikovv clipdeck/__init__.py; then
             echo "::error::Run scripts/set-owner.sh first"
             exit 1
           fi

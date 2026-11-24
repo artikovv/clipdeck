@@ -10,7 +10,7 @@ A clipboard history manager for Linux, inspired by [Ditto](https://ditto-cp.sour
 
 ## Install
 
-Download a package for your system from the [latest release](https://github.com/GHUSER/clipdeck/releases/latest):
+Download a package for your system from the [latest release](https://github.com/artikovv/clipdeck/releases/latest):
 
 | System | Package | Install |
 |---|---|---|
@@ -23,7 +23,7 @@ Download a package for your system from the [latest release](https://github.com/
 Or install from source (Debian, Ubuntu, Mint, Fedora, openSUSE, Arch):
 
 ```bash
-git clone https://github.com/GHUSER/clipdeck.git
+git clone https://github.com/artikovv/clipdeck.git
 cd clipdeck
 ./install.sh
 ```

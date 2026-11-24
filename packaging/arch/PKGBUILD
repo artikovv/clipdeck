@@ -1,10 +1,10 @@
-# Maintainer: Farroukh Artikov <GHEMAIL>
+# Maintainer: Farroukh Artikov <farroukh@gmail.com>
 pkgname=clipdeck
 pkgver=0.2.0
 pkgrel=1
 pkgdesc="Clipboard history manager with search, pins and sync"
 arch=('any')
-url="https://github.com/GHUSER/clipdeck"
+url="https://github.com/artikovv/clipdeck"
 license=('MIT')
 depends=('python' 'pyside6' 'python-cryptography' 'xdotool' 'xorg-xprop' 'hicolor-icon-theme')
 makedepends=('python-build' 'python-installer' 'python-setuptools' 'python-wheel')
@@ -18,7 +18,7 @@ build() {
 
 package() {
   cd "$pkgname-$pkgver"
-  local appid=io.github.GHUSER.Clipdeck
+  local appid=io.github.artikovv.Clipdeck
   python -m installer --destdir="$pkgdir" dist/*.whl
   install -Dm644 "data/$appid.desktop" "$pkgdir/usr/share/applications/$appid.desktop"
   install -Dm644 "data/$appid.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/$appid.svg"

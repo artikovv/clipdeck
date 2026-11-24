@@ -1,7 +1,7 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: clipdeck
-Upstream-Contact: Farroukh Artikov <GHEMAIL>
-Source: https://github.com/GHUSER/clipdeck
+Upstream-Contact: Farroukh Artikov <farroukh@gmail.com>
+Source: https://github.com/artikovv/clipdeck
 
 Files: *
 Copyright: 2026 Farroukh Artikov

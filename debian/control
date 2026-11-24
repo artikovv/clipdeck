@@ -1,16 +1,16 @@
 Source: clipdeck
 Section: utils
 Priority: optional
-Maintainer: Farroukh Artikov <GHEMAIL>
+Maintainer: Farroukh Artikov <farroukh@gmail.com>
 Build-Depends: debhelper-compat (= 13),
                dh-python,
                pybuild-plugin-pyproject,
                python3-all,
                python3-setuptools
 Standards-Version: 4.6.2
-Homepage: https://github.com/GHUSER/clipdeck
-Vcs-Browser: https://github.com/GHUSER/clipdeck
-Vcs-Git: https://github.com/GHUSER/clipdeck.git
+Homepage: https://github.com/artikovv/clipdeck
+Vcs-Browser: https://github.com/artikovv/clipdeck
+Vcs-Git: https://github.com/artikovv/clipdeck.git
 Rules-Requires-Root: no
 
 Package: clipdeck
