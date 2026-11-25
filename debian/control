@@ -1,7 +1,7 @@
 Source: clipdeck
 Section: utils
 Priority: optional
-Maintainer: Farroukh Artikov <farroukh@gmail.com>
+Maintainer: Farroukh Artikov <farroukh.tj@gmail.com>
 Build-Depends: debhelper-compat (= 13),
                dh-python,
                pybuild-plugin-pyproject,

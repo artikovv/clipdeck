@@ -58,9 +58,9 @@ appstream-util validate-relax --nonet %{buildroot}%{_metainfodir}/%{appid}.metai
 %{_mandir}/man1/clipdeck.1*
 
 %changelog
-* Wed Nov 25 2026 Farroukh Artikov <farroukh@gmail.com> - 0.3.0-1
+* Wed Nov 25 2026 Farroukh Artikov <farroukh.tj@gmail.com> - 0.3.0-1
 - Ditto-style keyboard shortcuts, tray menu and Options window
 
-* Tue Nov 24 2026 Farroukh Artikov <farroukh@gmail.com> - 0.2.0-1
+* Tue Nov 24 2026 Farroukh Artikov <farroukh.tj@gmail.com> - 0.2.0-1
 - Shortcut setup for Cinnamon, GNOME, MATE, Xfce and KDE
 - Packages for major distros, Flatpak, Snap and AppImage

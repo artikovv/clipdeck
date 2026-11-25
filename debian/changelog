@@ -2,7 +2,7 @@ clipdeck (0.3.0-1) unstable; urgency=medium
 
   * Ditto-style keyboard shortcuts, tray menu and Options window
 
- -- Farroukh Artikov <farroukh@gmail.com>  Wed, 25 Nov 2026 10:27:07 -0500
+ -- Farroukh Artikov <farroukh.tj@gmail.com>  Wed, 25 Nov 2026 10:27:07 -0500
 
 clipdeck (0.2.0-1) unstable; urgency=medium
 
@@ -11,4 +11,4 @@ clipdeck (0.2.0-1) unstable; urgency=medium
     Snap and AppImage.
   * Runs with either PySide6 or PyQt6.
 
- -- Farroukh Artikov <farroukh@gmail.com>  Tue, 24 Nov 2026 12:00:00 +0000
+ -- Farroukh Artikov <farroukh.tj@gmail.com>  Tue, 24 Nov 2026 12:00:00 +0000
