@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.3.0 (2026-11-25)
+
 - Delete removes the selected clip(s); while you type a search, it still edits the search text.
 - Select several clips with Ctrl+A, Shift+arrows, Shift+click or Ctrl+click, then paste, copy, pin, move or delete them together. Pasting several clips joins them one per line.
 - Ctrl+C copies clips without pasting; Ctrl+E or F2 edits a text clip; F3 shows a preview of the full text or image.

@@ -1,6 +1,6 @@
 # Clipdeck
 
-Version 0.2.0 · by Farroukh Artikov
+Version 0.3.0 · by Farroukh Artikov
 
 A clipboard history manager for Linux, inspired by [Ditto](https://ditto-cp.sourceforge.io/) on Windows.
 

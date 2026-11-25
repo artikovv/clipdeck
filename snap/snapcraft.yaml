@@ -1,6 +1,6 @@
 name: clipdeck
 base: core24
-version: '0.2.0'
+version: '0.3.0'
 title: Clipdeck
 summary: Clipboard history manager with search, pins and sync
 description: |

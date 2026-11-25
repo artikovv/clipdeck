@@ -1,6 +1,6 @@
 # Maintainer: Farroukh Artikov <farroukh@gmail.com>
 pkgname=clipdeck
-pkgver=0.2.0
+pkgver=0.3.0
 pkgrel=1
 pkgdesc="Clipboard history manager with search, pins and sync"
 arch=('any')
