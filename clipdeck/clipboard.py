@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import time
+from fnmatch import fnmatch
 
 from .qt import QBuffer, QByteArray, QIODevice, QMimeData, QObject, Qt, QUrl, Signal
 from .qt import QGuiApplication, QImage, QPixmap
@@ -78,6 +79,27 @@ def mime_from_payload(p: Payload, plain: bool = False) -> QMimeData:
     else:
         md.setText(p.text)
     return md
+
+
+def app_allowed(classes: set[str], include: str, exclude: str) -> bool:
+    """Whether to save a copy made in a window with these WM_CLASS names.
+    Patterns are separated by ";" and may use * wildcards, as in Ditto."""
+    def patterns(text):
+        return [p.strip().lower() for p in text.split(";") if p.strip()]
+    inc, exc = patterns(include) or ["*"], patterns(exclude)
+    if any(fnmatch(c, p) for c in classes for p in exc):
+        return False
+    if inc == ["*"]:
+        return True
+    return any(fnmatch(c, p) for c in classes for p in inc)
+
+
+def filter_types(p: Payload, cfg) -> Payload | None:
+    """Apply the "Supported types" settings; formatted text falls back to plain text."""
+    if p.kind == "html" and not cfg.get("save_html"):
+        p = Payload("text", p.text)
+    wanted = {"text": "save_text", "html": "save_text", "image": "save_images", "files": "save_files"}
+    return p if cfg.get(wanted[p.kind]) else None
 
 
 def combine(payloads: list[Payload]) -> Payload | None:

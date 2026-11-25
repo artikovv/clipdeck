@@ -130,21 +130,45 @@ def _ok(results) -> str | None:
     return failed[0].stderr.strip() or "unknown error" if failed else None
 
 
-def _cinnamon(accel: str, command: str, _old: str) -> str | None:
+# Every shortcut Clipdeck can register: key -> (command-line flag, name shown in settings).
+SHORTCUTS = {
+    "show": ("--show", "Clipdeck: show clipboard history"),
+    "plain": ("--paste-plain", "Clipdeck: paste clipboard as plain text"),
+    "save": ("--save", "Clipdeck: save current clipboard"),
+    **{f"pos{n}": (f"--paste {n}", f"Clipdeck: paste clip {n}") for n in range(1, 11)},
+}
+
+
+def _slug(key: str) -> str:
+    return "clipdeck" if key == "show" else f"clipdeck-{key}"
+
+
+def _cinnamon(key: str, accel: str, command: str, _old: str) -> str | None:
     schema = "org.cinnamon.desktop.keybindings"
     rel = "org.cinnamon.desktop.keybindings.custom-keybinding"
     base = "/org/cinnamon/desktop/keybindings/custom-keybindings/"
+    flag = SHORTCUTS[key][0]
     ids = _gs_list(schema, "custom-list")
-    target = next((i for i in ids if i != "__dummy__"
-                   and "--show" in (c := _run("gsettings", "get", f"{rel}:{base}{i}/", "command").stdout)
-                   and "clipdeck" in c.lower()), None)
+    target = None
+    for i in ids:
+        if i == "__dummy__":
+            continue
+        current = _run("gsettings", "get", f"{rel}:{base}{i}/", "command").stdout.strip()
+        if "clipdeck" in current.lower() and current.endswith(f"{flag}'"):
+            target = i
+            break
+    if not accel:  # remove
+        if target:
+            return _ok([_run("gsettings", "set", schema, "custom-list",
+                             "[" + ", ".join(_gv(i) for i in ids if i != target) + "]")])
+        return None
     if target is None:
         n = 0
         while f"custom{n}" in ids:
             n += 1
         target = f"custom{n}"
     path = f"{rel}:{base}{target}/"
-    results = [_run("gsettings", "set", path, "name", _gv(NAME)),
+    results = [_run("gsettings", "set", path, "name", _gv(SHORTCUTS[key][1])),
                _run("gsettings", "set", path, "command", _gv(command)),
                _run("gsettings", "set", path, "binding", f"[{_gv(accel)}]")]
     if target not in ids:
@@ -155,31 +179,41 @@ def _cinnamon(accel: str, command: str, _old: str) -> str | None:
     return _ok(results)
 
 
-def _gnome(accel: str, command: str, _old: str) -> str | None:
+def _gnome(key: str, accel: str, command: str, _old: str) -> str | None:
     schema = "org.gnome.settings-daemon.plugins.media-keys"
-    path = "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/clipdeck/"
+    path = f"/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/{_slug(key)}/"
     rel = f"{schema}.custom-keybinding:{path}"
-    results = [_run("gsettings", "set", rel, "name", _gv(NAME)),
+    paths = _gs_list(schema, "custom-keybindings")
+    if not accel:
+        if path in paths:
+            return _ok([_run("gsettings", "set", schema, "custom-keybindings",
+                             "[" + ", ".join(_gv(p) for p in paths if p != path) + "]")])
+        return None
+    results = [_run("gsettings", "set", rel, "name", _gv(SHORTCUTS[key][1])),
                _run("gsettings", "set", rel, "command", _gv(command)),
                _run("gsettings", "set", rel, "binding", _gv(accel))]
-    paths = _gs_list(schema, "custom-keybindings")
     if path not in paths:
         results.append(_run("gsettings", "set", schema, "custom-keybindings",
                             "[" + ", ".join(_gv(p) for p in paths + [path]) + "]"))
     return _ok(results)
 
 
-def _mate(accel: str, command: str, _old: str) -> str | None:
-    rel = "org.mate.control-center.keybinding:/org/mate/desktop/keybindings/clipdeck/"
-    return _ok([_run("gsettings", "set", rel, "name", _gv(NAME)),
+def _mate(key: str, accel: str, command: str, _old: str) -> str | None:
+    dpath = f"/org/mate/desktop/keybindings/{_slug(key)}/"
+    if not accel:
+        return _ok([_run("dconf", "reset", "-f", dpath)])
+    rel = f"org.mate.control-center.keybinding:{dpath}"
+    return _ok([_run("gsettings", "set", rel, "name", _gv(SHORTCUTS[key][1])),
                 _run("gsettings", "set", rel, "action", _gv(command)),
                 _run("gsettings", "set", rel, "binding", _gv(accel))])
 
 
-def _xfce(accel: str, command: str, old: str) -> str | None:
+def _xfce(key: str, accel: str, command: str, old: str) -> str | None:
     channel = "xfce4-keyboard-shortcuts"
     if old and old != accel:
         _run("xfconf-query", "-c", channel, "-p", f"/commands/custom/{old}", "-r")
+    if not accel:
+        return None
     return _ok([_run("xfconf-query", "-c", channel, "-p", f"/commands/custom/{accel}",
                      "-n", "-t", "string", "-s", command)])
 
@@ -200,40 +234,48 @@ def gtk_to_qt(accel: str) -> str:
     return "+".join(parts + [key])
 
 
-def _kde(accel: str, command: str, _old: str) -> str | None:
+def _kde(key: str, accel: str, command: str, _old: str) -> str | None:
     # KDE runs shortcuts attached to .desktop files listed in kglobalshortcutsrc.
     tool = shutil.which("kwriteconfig6") or shutil.which("kwriteconfig5")
     if not tool:
         return "kwriteconfig6 not found"
     apps = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / "applications"
+    name = "clipdeck-show.desktop" if key == "show" else f"{_slug(key)}.desktop"
+    args = [tool, "--file", "kglobalshortcutsrc", "--group", "services", "--group", name, "--key", "_launch"]
+    if not accel:
+        (apps / name).unlink(missing_ok=True)
+        _run(*args, "--delete")
+        return None
     apps.mkdir(parents=True, exist_ok=True)
-    name = "clipdeck-show.desktop"
-    (apps / name).write_text("[Desktop Entry]\nType=Application\nName=Clipdeck: show history\n"
+    (apps / name).write_text(f"[Desktop Entry]\nType=Application\nName={SHORTCUTS[key][1]}\n"
                              f"Exec={command}\nIcon={APP_ID}\nNoDisplay=true\n"
                              f"X-KDE-Shortcuts={gtk_to_qt(accel)}\n")
-    err = _ok([_run(tool, "--file", "kglobalshortcutsrc", "--group", "services",
-                    "--group", name, "--key", "_launch", gtk_to_qt(accel))])
-    if err:
-        return err
-    return "log out and back in to activate it"
+    err = _ok([_run(*args, gtk_to_qt(accel))])
+    return err or "log out and back in to activate it"
 
 
 HANDLERS = {"cinnamon": _cinnamon, "gnome": _gnome, "mate": _mate, "xfce": _xfce, "kde": _kde}
 
 
-def register_shortcut(accel: str, command: str, old_accel: str = "") -> tuple[bool, str]:
-    """Bind `accel` (GTK format, e.g. <Primary>grave) to `command`."""
-    manual = (f"Add a custom shortcut in your desktop's keyboard settings "
-              f"that runs: {command} --show")
+def register_shortcut(accel: str, command: str, old_accel: str = "",
+                      key: str = "show") -> tuple[bool, str]:
+    """Bind `accel` (GTK format, e.g. <Primary>grave) to `command` plus the flag for `key`.
+    An empty `accel` removes the shortcut."""
+    full = f"{command} {SHORTCUTS[key][0]}"
+    manual = f"Add a custom shortcut in your desktop's keyboard settings that runs: {full}"
     if sandbox() in ("flatpak", "snap"):
+        if not accel:
+            return True, ""
         return False, f"Clipdeck can't set shortcuts from inside a {sandbox()} sandbox. {manual}"
     desktop = current_desktop()
     handler = HANDLERS.get(desktop)
     if handler is None:
-        return False, f"Clipdeck doesn't know how to set shortcuts on {desktop}. {manual}"
-    full = f"{command} --show"
-    note = handler(accel, full, old_accel)
+        return (True, "") if not accel else \
+            (False, f"Clipdeck doesn't know how to set shortcuts on {desktop}. {manual}")
+    note = handler(key, accel, full, old_accel)
     if note and note != "log out and back in to activate it":
         return False, f"Couldn't set the shortcut ({note}). {manual}"
-    msg = f"Shortcut {accel} now opens Clipdeck."
+    if not accel:
+        return True, ""
+    msg = f"Shortcut {gtk_to_qt(accel)} set."
     return True, msg + (f" On KDE, {note}." if note else "")

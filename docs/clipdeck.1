@@ -3,7 +3,7 @@
 clipdeck \- clipboard history manager
 .SH SYNOPSIS
 .B clipdeck
-[\fB\-\-show\fR | \fB\-\-background\fR | \fB\-\-quit\fR | \fB\-\-version\fR]
+[\fB\-\-show\fR | \fB\-\-paste\fR \fIN\fR | \fB\-\-paste\-plain\fR | \fB\-\-save\fR | \fB\-\-background\fR | \fB\-\-quit\fR | \fB\-\-version\fR]
 .SH DESCRIPTION
 Clipdeck keeps a searchable history of everything you copy. It runs in the
 system tray; press its keyboard shortcut (Ctrl+` by default) to open the
@@ -15,6 +15,15 @@ Start Clipdeck, or open the history if it is already running.
 .TP
 .B \-\-show
 Open the history window. Bind this to a keyboard shortcut.
+.TP
+.BI \-\-paste " N"
+Paste clip number \fIN\fR (1 is the top of the history, counting pinned clips first).
+.TP
+.B \-\-paste\-plain
+Paste what is on the clipboard as plain text.
+.TP
+.B \-\-save
+Save what is on the clipboard now, even while capturing is paused.
 .TP
 .B \-\-background
 Start without showing anything if Clipdeck isn't running (used at login).

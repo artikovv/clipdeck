@@ -4,11 +4,11 @@ from __future__ import annotations
 import html
 import os
 
-from .qt import QEvent, QItemSelectionModel, QSize, Qt, QTimer, Signal
-from .qt import QCursor, QFontMetrics, QGuiApplication, QIcon, QPixmap
+from .qt import QEvent, QItemSelectionModel, QPoint, QSize, Qt, QTimer, Signal
+from .qt import QCursor, QFont, QFontMetrics, QGuiApplication, QIcon, QPixmap
 from .qt import (QAbstractItemView, QApplication, QComboBox, QFrame, QHBoxLayout,
                  QInputDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMenu,
-                 QMessageBox, QPlainTextEdit, QStackedWidget, QToolButton, QVBoxLayout,
+                 QMessageBox, QPlainTextEdit, QSizeGrip, QStackedWidget, QToolButton, QVBoxLayout,
                  QWidget)
 
 from . import x11
@@ -41,10 +41,11 @@ class Popup(QWidget):
     copy_requested = Signal(object)         # list of clip ids
     send_requested = Signal(object)         # list of clip ids
 
-    def __init__(self, store: Storage):
+    def __init__(self, store: Storage, cfg=None):
         super().__init__(None, Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint
                          | Qt.WindowType.WindowStaysOnTopHint)
         self.store = store
+        self.cfg = cfg
         self._modal = False
         self._thumbs: dict[int, QIcon] = {}
         self._labels: dict[int, str] = {}
@@ -110,29 +111,78 @@ class Popup(QWidget):
         self.hint.setFont(f)
         self._hint_reset = QTimer(self, singleShot=True, interval=1800)
         self._hint_reset.timeout.connect(lambda: self.hint.setText(HINT))
-        lay.addWidget(self.hint)
+        bottom = QHBoxLayout()
+        bottom.addWidget(self.hint, 1)
+        bottom.addWidget(QSizeGrip(self), 0, Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignRight)
+        lay.addLayout(bottom)
 
         self.search.installEventFilter(self)
         self.list.installEventFilter(self)
         self.rebuild_scopes()
+        self.apply_font(cfg.get("font") if cfg else "")
 
     # ---- showing ---------------------------------------------------------
     def present(self):
         self._modal = False
         self.search.clear()
         self.rebuild_scopes()
-        pos = QCursor.pos()
-        screen = QGuiApplication.screenAt(pos) or QGuiApplication.primaryScreen()
-        geo = screen.availableGeometry()
-        x = min(max(pos.x(), geo.left()), geo.right() - self.width())
-        y = min(max(pos.y(), geo.top()), geo.bottom() - self.height())
-        self.move(x, y)
+        self._place()
         self.show()
         self.refresh()  # after show(), so long lines are shortened to the real width
         self.raise_()
         self.activateWindow()
         self.search.setFocus()
         QTimer.singleShot(80, self._ensure_focus)
+
+    def _saved_geometry(self) -> list[int] | None:
+        try:
+            x, y, w, h = (int(v) for v in self.cfg.get("popup_geometry").split(","))
+            return [x, y, w, h]
+        except (AttributeError, ValueError):
+            return None
+
+    def _place(self):
+        """Position the window as chosen in Settings, keeping it fully on screen."""
+        saved = self._saved_geometry()
+        if saved:
+            self.resize(max(saved[2], 320), max(saved[3], 300))
+        mode = self.cfg.get("popup_position") if self.cfg else "cursor"
+        pos = QCursor.pos()
+        screen = QGuiApplication.screenAt(pos) or QGuiApplication.primaryScreen()
+        geo = screen.availableGeometry()
+        if mode == "last" and saved:
+            x, y = saved[0], saved[1]
+            here = QGuiApplication.screenAt(QPoint(x + 10, y + 10))
+            geo = (here or screen).availableGeometry()
+        elif mode == "center":
+            x = geo.center().x() - self.width() // 2
+            y = geo.center().y() - self.height() // 2
+        else:
+            x, y = pos.x(), pos.y()
+        self.resize(min(self.width(), geo.width()), min(self.height(), geo.height()))
+        x = min(max(x, geo.left()), geo.right() - self.width())
+        y = min(max(y, geo.top()), geo.bottom() - self.height())
+        self.move(x, y)
+
+    def hideEvent(self, e):
+        if self.cfg is not None:
+            g = self.geometry()
+            self.cfg.set("popup_geometry", f"{g.x()},{g.y()},{g.width()},{g.height()}")
+        super().hideEvent(e)
+
+    def mousePressEvent(self, e):
+        # Drag the window by its edges or the hint line (it has no title bar).
+        if e.button() == Qt.MouseButton.LeftButton and self.windowHandle():
+            self.windowHandle().startSystemMove()
+        super().mousePressEvent(e)
+
+    def apply_font(self, spec: str):
+        font = QFont()
+        if spec:
+            font.fromString(spec)
+        for widget in (self.list, self.search, self.preview_text):
+            widget.setFont(font)
+        self._elide_all()
 
     def _ensure_focus(self):
         if self.isVisible() and not self.isActiveWindow():

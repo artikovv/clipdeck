@@ -8,6 +8,12 @@
 - Esc clears the search before closing the window.
 - Clips show their Ctrl+1–9 quick-paste number.
 - Long clips are shortened with "…" instead of adding a horizontal scrollbar.
+- Settings reorganized like Ditto's Options, with new tabs and options:
+  - General: delete clips not used for a number of days, turn the clip limit off, light or dark theme, window position (mouse pointer, centre, or where you left it), font, and a custom history file location. The history window can be dragged and resized, and remembers its size.
+  - Supported types: choose which kinds of copies to save, and include or exclude apps.
+  - Keyboard shortcuts: paste the clipboard as plain text, save the clipboard, and paste any of the 10 most recent clips directly. Shortcuts are recorded by pressing them and work with any keyboard layout.
+  - Stats and About tabs.
+- New commands: `--paste N`, `--paste-plain` and `--save`.
 - A tray menu modelled on Ditto's: delete clip data by age, delete unused clips, back up and restore the history, import text files and images, add a clip by hand, save the current clipboard while paused, a startup message you can turn off, and a Help window.
 
 ## 0.2.0 (2026-11-24)

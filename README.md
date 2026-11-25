@@ -83,6 +83,24 @@ Right-click the Clipdeck icon in the system tray for:
 - **Pause capturing**: stop recording copies for a while; **Save current clipboard** still saves one when you want it
 - **Help**: keyboard shortcuts and a link to this page
 
+### Settings
+
+Open **Settings** from the tray menu:
+
+- **General**: start at login, how many clips to keep, deleting clips not used for a number of days, light or dark theme, where the window opens, the font, and where the history file is stored. You can drag the history window by its edges and resize it from the bottom-right corner; it remembers its size.
+- **Supported types**: choose whether to save plain text, formatted text, images and copied files, and which apps to save copies from. For example, put `keepassxc` under **Never from** to never save anything copied in KeePassXC.
+- **Keyboard shortcuts**: shortcuts to open the history, paste the clipboard as plain text, save the clipboard, and paste any of the 10 most recent clips directly (for example **Ctrl+Alt+1** for the newest). Click a box and press the keys; it works with any keyboard layout.
+- **Sync**, **Stats** (how many copies and pastes, history size) and **About**.
+
+The shortcuts run these commands, which you can also use in scripts:
+
+| Command | Does |
+|---|---|
+| `clipdeck --show` | Open the history |
+| `clipdeck --paste 3` | Paste clip number 3 |
+| `clipdeck --paste-plain` | Paste the clipboard as plain text |
+| `clipdeck --save` | Save the clipboard now, even while capturing is paused |
+
 ## Sync between computers
 
 1. Install Clipdeck on each computer.

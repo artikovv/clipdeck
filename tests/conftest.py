@@ -14,7 +14,16 @@ from clipdeck.qt import QApplication  # noqa: E402
 
 @pytest.fixture(scope="session")
 def qapp():
-    return QApplication.instance() or QApplication([])
+    app = QApplication.instance() or QApplication([])
+    yield app
+    # Delete leftover windows while Qt is still running; otherwise Python may free
+    # them after Qt has shut down, which can crash the test process on exit.
+    from clipdeck.qt import QEvent
+    for widget in app.topLevelWidgets():
+        widget.close()
+        widget.deleteLater()
+    app.sendPostedEvents(None, QEvent.Type.DeferredDelete.value)
+    app.processEvents()
 
 
 @pytest.fixture
