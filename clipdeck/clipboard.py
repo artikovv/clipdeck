@@ -105,6 +105,10 @@ class ClipboardMonitor(QObject):
         self._ignore_until = time.monotonic() + 0.6
         self.cb.setMimeData(mime_from_payload(p, plain))
 
+    def read_now(self) -> Payload | None:
+        """What's on the clipboard right now, even while capturing is paused."""
+        return payload_from_mime(self.cb.mimeData(), self.max_image_bytes())
+
     def _on_change(self):
         if self.paused or time.monotonic() < self._ignore_until:
             return

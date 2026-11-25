@@ -15,6 +15,7 @@ DEFAULTS = {
     "terminal_classes": ("gnome-terminal-server, gnome-terminal, xfce4-terminal, mate-terminal, "
                          "konsole, tilix, terminator, kitty, alacritty, xterm, urxvt, wezterm"),
     "autostart": True,
+    "startup_message": True,
     "sync_enabled": False,
     "sync_port": 47811,
     "sync_peers": "",
@@ -55,7 +56,7 @@ def local_addresses() -> str:
 
 
 class SettingsDialog(QDialog):
-    def __init__(self, cfg: Config, parent=None):
+    def __init__(self, cfg: Config, parent=None, focus: str | None = None):
         super().__init__(parent)
         self.cfg = cfg
         self.setWindowTitle("Clipdeck settings")
@@ -115,6 +116,9 @@ class SettingsDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.addWidget(tabs)
         layout.addWidget(buttons)
+        if focus == "hotkey":
+            self.hotkey.setFocus()
+            self.hotkey.selectAll()
 
     def accept(self):
         if self.sync_enabled.isChecked() and not self.passphrase.text():

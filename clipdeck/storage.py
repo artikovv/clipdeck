@@ -84,12 +84,21 @@ class Storage:
         self.db.row_factory = sqlite3.Row
         self.db.create_function("casefind", 2, _casefind, deterministic=True)
         self.db.execute("PRAGMA journal_mode=WAL")
-        self.db.executescript(SCHEMA)
-        self.db.commit()
+        self._migrate()
         try:
             os.chmod(path, 0o600)  # clipboard history can hold sensitive data
         except OSError:
             pass
+
+    def _migrate(self):
+        """Create tables, and upgrade databases from older versions (or restored backups)."""
+        self.db.executescript(SCHEMA)
+        columns = {r["name"] for r in self.db.execute("PRAGMA table_info(clips)")}
+        if "uses" not in columns:
+            # Added in 0.3.0. Clips used since they were first copied count as used once.
+            self.db.execute("ALTER TABLE clips ADD COLUMN uses INTEGER NOT NULL DEFAULT 0")
+            self.db.execute("UPDATE clips SET uses=1 WHERE last_used > created + 1")
+        self.db.commit()
 
     @staticmethod
     def _clip(r: sqlite3.Row) -> Clip:
@@ -165,6 +174,11 @@ class Storage:
         self.db.execute("UPDATE clips SET last_used=? WHERE id=?", (time.time(), clip_id))
         self.db.commit()
 
+    def mark_used(self, clip_ids: list[int]):
+        """Count a paste or copy, so "Delete unused clips" spares these."""
+        self.db.executemany("UPDATE clips SET uses=uses+1 WHERE id=?", [(i,) for i in clip_ids])
+        self.db.commit()
+
     def set_pinned(self, clip_id: int, pinned: bool):
         self.db.execute("UPDATE clips SET pinned=? WHERE id=?", (int(pinned), clip_id))
         self.db.commit()
@@ -179,8 +193,64 @@ class Storage:
 
     def clear_loose(self):
         """Delete everything that isn't pinned or in a group."""
-        self.db.execute("DELETE FROM clips WHERE pinned=0 AND group_id IS NULL")
+        self.delete_matching()
+
+    @staticmethod
+    def _cleanup_where(older_than_days: int | None, include_kept: bool,
+                       unused_only: bool) -> tuple[str, list]:
+        where, args = [], []
+        if not include_kept:
+            where.append("pinned=0 AND group_id IS NULL")
+        if older_than_days is not None:
+            where.append("last_used < ?")
+            args.append(time.time() - older_than_days * 86400)
+        if unused_only:
+            where.append("uses=0")
+        return (" WHERE " + " AND ".join(where) if where else ""), args
+
+    def count_matching(self, older_than_days: int | None = None, include_kept: bool = False,
+                       unused_only: bool = False) -> int:
+        where, args = self._cleanup_where(older_than_days, include_kept, unused_only)
+        return self.db.execute(f"SELECT COUNT(*) FROM clips{where}", args).fetchone()[0]
+
+    def delete_matching(self, older_than_days: int | None = None, include_kept: bool = False,
+                        unused_only: bool = False) -> int:
+        """Delete clips last used more than `older_than_days` ago (or all), sparing pinned
+        and grouped clips unless `include_kept`. Returns how many were deleted."""
+        where, args = self._cleanup_where(older_than_days, include_kept, unused_only)
+        n = self.db.execute(f"DELETE FROM clips{where}", args).rowcount
         self.db.commit()
+        self.db.execute("VACUUM")  # actually free the space
+        return n
+
+    # ---- backup ----------------------------------------------------------
+    def backup(self, path: str):
+        dest = sqlite3.connect(path)
+        try:
+            self.db.backup(dest)
+        finally:
+            dest.close()
+
+    @staticmethod
+    def is_backup(path: str) -> int | None:
+        """Number of clips in a Clipdeck backup, or None if it isn't one."""
+        try:
+            src = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+            try:
+                return src.execute("SELECT COUNT(*) FROM clips").fetchone()[0]
+            finally:
+                src.close()
+        except sqlite3.Error:
+            return None
+
+    def restore(self, path: str):
+        """Replace the whole history with a backup."""
+        src = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+        try:
+            src.backup(self.db)
+        finally:
+            src.close()
+        self._migrate()
 
     # ---- groups ----------------------------------------------------------
     def groups(self) -> list[tuple[int, str]]:

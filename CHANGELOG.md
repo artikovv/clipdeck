@@ -8,6 +8,7 @@
 - Esc clears the search before closing the window.
 - Clips show their Ctrl+1–9 quick-paste number.
 - Long clips are shortened with "…" instead of adding a horizontal scrollbar.
+- A tray menu modelled on Ditto's: delete clip data by age, delete unused clips, back up and restore the history, import text files and images, add a clip by hand, save the current clipboard while paused, a startup message you can turn off, and a Help window.
 
 ## 0.2.0 (2026-11-24)
 

@@ -68,6 +68,21 @@ Right-click a clip, or several selected clips, to paste, copy, edit, pin, move t
 
 Clipdeck records text, formatted text (HTML), images, and copied files (pasting files works in Nemo). It skips anything a password manager like KeePassXC marks as secret. To stop recording for a while, choose **Pause capturing** in the tray menu.
 
+### Tray menu
+
+Right-click the Clipdeck icon in the system tray for:
+
+- **Show history** (or just click the icon) and **Settings**
+- **Show startup message**: turn the "Clipdeck is running" notification on or off
+- **Keyboard shortcut**: change the shortcut that opens the history
+- **Delete clip data**: delete clips not used for a number of days, or all of them
+- **Delete unused clips**: delete clips you've never pasted or copied
+- **Back up history** and **Restore history**: save your whole history to a file, or bring it back
+- **Import clips**: add text files and images as clips
+- **New clip**: type a clip by hand
+- **Pause capturing**: stop recording copies for a while; **Save current clipboard** still saves one when you want it
+- **Help**: keyboard shortcuts and a link to this page
+
 ## Sync between computers
 
 1. Install Clipdeck on each computer.

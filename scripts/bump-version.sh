@@ -21,7 +21,8 @@ sed -i "s|  <releases>|  <releases>\n    <release version=\"$new\" date=\"$today
 { printf 'clipdeck (%s-1) unstable; urgency=medium\n\n  * %s\n\n -- Farroukh Artikov <%s>  %s\n\n' \
     "$new" "$summary" "$email" "$(LC_ALL=C date -R)"; cat debian/changelog; } > debian/changelog.new
 mv debian/changelog.new debian/changelog
-sed -i "s/^## Unreleased/## $new ($today)/" CHANGELOG.md
+# Release the "Unreleased" notes under the new version, and start a fresh "Unreleased" section.
+sed -i "s/^## Unreleased/## Unreleased\n\n## $new ($today)/" CHANGELOG.md
 
 echo "Version $old -> $new. Review with 'git diff', then:"
 echo "  git commit -am 'Release $new' && git tag v$new && git push && git push origin v$new"

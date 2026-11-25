@@ -4,14 +4,16 @@ from __future__ import annotations
 import signal
 import sys
 import time
+from pathlib import Path
 
-from .qt import QObject, Qt, QTimer
-from .qt import QAction, QColor, QIcon, QPainter, QPixmap
+from .qt import QObject, Qt, QTimer, QUrl
+from .qt import QAction, QColor, QDesktopServices, QIcon, QImage, QPainter, QPixmap
 from .qt import QLocalServer
-from .qt import QApplication, QMenu, QMessageBox, QSystemTrayIcon
+from .qt import QApplication, QFileDialog, QInputDialog, QMenu, QMessageBox, QSystemTrayIcon
 
 from . import APP_ID, __author__, __version__, desktop, x11
-from .clipboard import ClipboardMonitor, combine, make_thumb
+from .clipboard import ClipboardMonitor, combine, image_to_png, make_thumb
+from .dialogs import DeleteDataDialog, help_html
 from .popup import Popup
 from .settings import Config, SettingsDialog
 from .storage import DATA_DIR, Payload, Storage
@@ -74,16 +76,30 @@ class Clipdeck(QObject):
         self.tray = QSystemTrayIcon(app_icon(), self)
         self.tray.setToolTip("Clipdeck")
         menu = QMenu()
-        about = menu.addAction(f"Clipdeck {__version__} by {__author__}")
-        about.setEnabled(False)
+        show = menu.addAction("Show history", lambda: self.show_popup(from_tray=True))
+        menu.setDefaultAction(show)  # shown in bold, as in Ditto
+        menu.addAction("Settings…", lambda: self.open_settings())
         menu.addSeparator()
-        menu.addAction("Show history", lambda: self.show_popup(from_tray=True))
+        startup = QAction("Show startup message", menu, checkable=True)
+        startup.setChecked(self.cfg.get("startup_message"))
+        startup.toggled.connect(lambda on: self.cfg.set("startup_message", on))
+        menu.addAction(startup)
+        menu.addAction("Keyboard shortcut…", lambda: self.open_settings(focus="hotkey"))
+        menu.addAction("Delete clip data…", self._delete_clip_data)
+        menu.addAction("Delete unused clips…", self._delete_unused)
+        menu.addSeparator()
+        menu.addAction("Back up history…", self._backup)
+        menu.addAction("Restore history…", self._restore)
+        menu.addSeparator()
+        menu.addAction("Import clips…", self._import)
+        menu.addAction("New clip…", self._new_clip)
+        menu.addSeparator()
+        menu.addAction("Help", self._help)
+        menu.addSeparator()
         self.pause_action = QAction("Pause capturing", menu, checkable=True)
         self.pause_action.toggled.connect(self._set_paused)
         menu.addAction(self.pause_action)
-        menu.addSeparator()
-        menu.addAction("Clear history…", self._clear_history)
-        menu.addAction("Settings…", self.open_settings)
+        menu.addAction("Save current clipboard", self._save_current)
         menu.addSeparator()
         menu.addAction("Quit", self.quit)
         self._menu = menu
@@ -106,17 +122,120 @@ class Clipdeck(QObject):
         self.monitor.paused = paused
         self.tray.setToolTip("Clipdeck (paused)" if paused else "Clipdeck")
 
-    def _clear_history(self):
-        answer = QMessageBox.question(None, "Clear history",
-                                      "Delete all clips except pinned and grouped ones?")
-        if answer == QMessageBox.StandardButton.Yes:
-            self.store.clear_loose()
-            if self.popup.isVisible():
-                self.popup.refresh()
+    def _changed(self, message: str | None = None):
+        if self.popup.isVisible():
+            self.popup.refresh()
+        if message:
+            self.tray.showMessage("Clipdeck", message, QSystemTrayIcon.MessageIcon.Information, 3000)
 
-    def open_settings(self):
+    def _confirm(self, title: str, text: str) -> bool:
+        return QMessageBox.question(None, title, text) == QMessageBox.StandardButton.Yes
+
+    def _delete_clip_data(self):
+        dialog = DeleteDataDialog(self.store)
+        if dialog.exec():
+            n = self.store.delete_matching(**dialog.choice())
+            self._changed(f"Deleted {n} clip{'s' if n != 1 else ''}.")
+
+    def _delete_unused(self):
+        n = self.store.count_matching(unused_only=True)
+        if n == 0:
+            QMessageBox.information(None, "Delete unused clips",
+                                    "Every clip has been pasted or copied at least once.")
+            return
+        if self._confirm("Delete unused clips",
+                         f"Delete {n} clip{'s' if n != 1 else ''} you've never pasted or copied? "
+                         "Pinned and grouped clips are kept."):
+            self._changed(f"Deleted {self.store.delete_matching(unused_only=True)} clips.")
+
+    def _backup(self):
+        name = f"clipdeck-backup-{time.strftime('%Y-%m-%d')}.db"
+        path, _ = QFileDialog.getSaveFileName(None, "Back up history", str(Path.home() / name),
+                                              "Clipdeck backups (*.db)")
+        if path:
+            try:
+                self.store.backup(path)
+                self._changed("History backed up.")
+            except Exception as e:
+                QMessageBox.warning(None, "Back up history", f"Couldn't save the backup: {e}")
+
+    def _restore(self):
+        path, _ = QFileDialog.getOpenFileName(None, "Restore history", str(Path.home()),
+                                              "Clipdeck backups (*.db);;All files (*)")
+        if not path:
+            return
+        count = self.store.is_backup(path)
+        if count is None:
+            QMessageBox.warning(None, "Restore history", "That file isn't a Clipdeck backup.")
+            return
+        if self._confirm("Restore history",
+                         f"Replace your whole clipboard history with this backup ({count} clips)? "
+                         "Your current history will be lost."):
+            try:
+                self.store.restore(path)
+                self.popup.rebuild_scopes()
+                self._changed(f"Restored {count} clips.")
+            except Exception as e:
+                QMessageBox.warning(None, "Restore history", f"Couldn't restore the backup: {e}")
+
+    def _import(self):
+        paths, _ = QFileDialog.getOpenFileNames(
+            None, "Import clips", str(Path.home()),
+            "Text and images (*.txt *.md *.csv *.json *.html *.png *.jpg *.jpeg *.gif *.webp *.bmp);;"
+            "All files (*)")
+        added, skipped = 0, []
+        for path in paths:
+            payload = self._payload_from_file(Path(path))
+            if payload:
+                self._store(payload)
+                added += 1
+            else:
+                skipped.append(Path(path).name)
+        if paths:
+            msg = f"Imported {added} clip{'s' if added != 1 else ''}."
+            if skipped:
+                msg += f" Skipped: {', '.join(skipped[:3])}{'…' if len(skipped) > 3 else ''}"
+            self._changed(msg)
+
+    def _payload_from_file(self, path: Path) -> Payload | None:
+        max_bytes = self.cfg.get("max_image_mb") * 1024 * 1024
+        try:
+            if path.stat().st_size > max_bytes:
+                return None
+            img = QImage(str(path))
+            if not img.isNull():
+                return Payload("image", f"Image {img.width()}×{img.height()}", None, image_to_png(img))
+            text = path.read_bytes().decode("utf-8")
+        except (OSError, UnicodeDecodeError):
+            return None  # unreadable, or not text
+        return Payload("text", text) if text.strip() else None
+
+    def _new_clip(self):
+        text, ok = QInputDialog.getMultiLineText(None, "New clip", "Text:")
+        if ok and text.strip():
+            self._store(Payload("text", text))
+            self._changed("Clip added.")
+
+    def _save_current(self):
+        payload = self.monitor.read_now()
+        if payload:
+            self._store(payload)
+            self._changed("Saved the current clipboard.")
+        else:
+            self._changed("The clipboard is empty, or holds something Clipdeck can't save.")
+
+    def _help(self):
+        box = QMessageBox()
+        box.setWindowTitle("Clipdeck help")
+        box.setIconPixmap(app_icon().pixmap(64, 64))
+        box.setTextFormat(Qt.TextFormat.RichText)
+        box.setText(help_html(desktop.gtk_to_qt(self.cfg.get("hotkey"))))
+        box.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
+        box.exec()
+
+    def open_settings(self, focus: str | None = None):
         self.popup.hide()
-        if SettingsDialog(self.cfg).exec():
+        if SettingsDialog(self.cfg, focus=focus).exec():
             self.apply_settings()
 
     def apply_settings(self):
@@ -164,6 +283,7 @@ class Clipdeck(QObject):
         payload = self._payload(ids)
         if payload:
             self.monitor.set_clipboard(payload)
+        self.store.mark_used(ids)
 
     def on_send(self, ids: list[int]):
         if not (self.sync.running and self.sync.peers):
@@ -186,6 +306,7 @@ class Clipdeck(QObject):
             self.popup.flash("Images can't be pasted together with other clips")
             return
         self.monitor.set_clipboard(payload, plain)
+        self.store.mark_used(ids)
         if len(ids) == 1:
             self.store.touch(ids[0])  # a single pasted clip moves to the top, as in Ditto
         self.popup.hide()
@@ -234,6 +355,7 @@ def run(ipc_path: str, show_now: bool = False, background: bool = False) -> int:
     controller = Clipdeck(server)
     if show_now:
         QTimer.singleShot(0, controller.show_popup)
-    elif not background:
-        controller.notify("Clipdeck is running. Press your shortcut to open clipboard history.")
+    if controller.cfg.get("startup_message"):
+        hotkey = desktop.gtk_to_qt(controller.cfg.get("hotkey"))
+        controller.notify(f"Clipdeck is running. Press {hotkey} to open your clipboard history.")
     return app.exec()
